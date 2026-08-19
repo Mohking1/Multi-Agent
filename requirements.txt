@@ -1,0 +1,7 @@
+autogen-agentchat>=0.4.0
+autogen-ext[openai]>=0.4.0
+mcp>=1.0.0
+google-genai>=0.1.0
+python-dotenv>=1.0.0
+pymupdf>=1.24.0
+mem0ai>=0.1.0
