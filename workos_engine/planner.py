@@ -3,6 +3,7 @@
 import inspect
 import json
 import logging
+import re
 import uuid
 from typing import Any
 
@@ -23,16 +24,16 @@ from workos_engine.types import (
 logger = logging.getLogger(__name__)
 
 
-def _lookup_variable(
-    var_ref: str,
+def _lookup_exact_variable(
+    var_token: str,
     completed_steps: dict[int, PlanStep],
     prev_step: PlanStep | None,
 ) -> Any:
-    """Resolves a variable reference string (e.g. '$step_1.saved_path' or '$prev.total')."""
-    if not isinstance(var_ref, str) or not var_ref.startswith("$"):
-        return var_ref
+    """Resolves a single atomic token like '$step_1.saved_path' or '$prev.output'."""
+    if not isinstance(var_token, str) or not var_token.startswith("$"):
+        return var_token
 
-    token = var_ref[1:]  # strip leading $
+    token = var_token[1:]  # strip leading $
     parts = token.split(".")
     target_step: PlanStep | None = None
 
@@ -46,7 +47,7 @@ def _lookup_variable(
         target_step = prev_step
 
     if not target_step or not target_step.result:
-        return var_ref
+        return var_token
 
     res = target_step.result
     if len(parts) == 1:
@@ -54,34 +55,117 @@ def _lookup_variable(
             return res.data
         if res.artifacts:
             return res.artifacts[0]
-        return var_ref
+        return var_token
 
-    # Navigate properties
     current: Any = res.data
     field_path = parts[1:]
 
-    if field_path[0] == "data":
+    if field_path and field_path[0] == "data":
         field_path = field_path[1:]
         current = res.data
-    elif field_path[0] == "artifacts":
+    elif field_path and field_path[0] == "artifacts":
         return res.artifacts
-    elif field_path[0] in ("saved_path", "file_path") and (
-        current is None or (isinstance(current, dict) and field_path[0] not in current)
-    ):
-        if res.artifacts:
-            return res.artifacts[0]
 
     for part in field_path:
         if isinstance(current, dict):
-            current = current.get(part)
+            if part in current:
+                current = current[part]
+            # Fallback smart extraction for web URLs
+            elif part in ("url", "output_url", "link", "web_url", "source_url"):
+                if "url" in current:
+                    current = current["url"]
+                elif (
+                    "results" in current
+                    and isinstance(current["results"], list)
+                    and current["results"]
+                ):
+                    first_res = current["results"][0]
+                    current = (
+                        first_res.get("url") if isinstance(first_res, dict) else str(first_res)
+                    )
+                elif "pages" in current and isinstance(current["pages"], list) and current["pages"]:
+                    first_page = current["pages"][0]
+                    current = (
+                        first_page.get("url") if isinstance(first_page, dict) else str(first_page)
+                    )
+                elif (
+                    "citations" in current
+                    and isinstance(current["citations"], list)
+                    and current["citations"]
+                ):
+                    first_cit = current["citations"][0]
+                    current = (
+                        first_cit.get("url") if isinstance(first_cit, dict) else str(first_cit)
+                    )
+                else:
+                    return var_token
+            # Fallback smart extraction for file paths
+            elif part in ("saved_path", "file_path", "path", "attachment", "filename"):
+                if res.artifacts:
+                    return res.artifacts[0]
+                current = (
+                    current.get("saved_path")
+                    or current.get("file_path")
+                    or current.get("path")
+                    or var_token
+                )
+            # Fallback smart extraction for text content
+            elif part in ("output", "summary", "content", "text", "body"):
+                current = (
+                    current.get("content")
+                    or current.get("text")
+                    or current.get("summary")
+                    or current.get("body")
+                    or current.get("final_output")
+                    or var_token
+                )
+            else:
+                return var_token
         elif hasattr(current, part):
             current = getattr(current, part)
+        elif isinstance(current, list):
+            try:
+                list_idx = int(part)
+                current = current[list_idx]
+            except (ValueError, IndexError):
+                if (
+                    part in ("url", "output_url", "link")
+                    and current
+                    and isinstance(current[0], dict)
+                ):
+                    current = current[0].get("url", var_token)
+                else:
+                    return var_token
         else:
             if part in ("saved_path", "file_path", "artifact") and res.artifacts:
                 return res.artifacts[0]
-            return var_ref
+            return var_token
 
-    return current if current is not None else var_ref
+    return current if current is not None else var_token
+
+
+def _lookup_variable(
+    var_ref: str,
+    completed_steps: dict[int, PlanStep],
+    prev_step: PlanStep | None,
+) -> Any:
+    """Resolves variable references, supporting exact object lookups and embedded string substitutions."""
+    if not isinstance(var_ref, str) or "$" not in var_ref:
+        return var_ref
+
+    # 1. Exact match (e.g. "$step_1.data" or "$step_2.saved_path") -> returns raw data object
+    exact_pattern = r"^\$(?:step_\d+|prev|previous)(?:\.[a-zA-Z0-9_]+)*$"
+    if re.match(exact_pattern, var_ref.strip()):
+        return _lookup_exact_variable(var_ref.strip(), completed_steps, prev_step)
+
+    # 2. Embedded string substitution (e.g. "$step_1.creator projects" -> "Guido van Rossum projects")
+    def _replace_match(match):
+        tok = match.group(0)
+        resolved_val = _lookup_exact_variable(tok, completed_steps, prev_step)
+        return str(resolved_val) if resolved_val != tok else tok
+
+    token_pattern = r"\$(?:step_\d+|prev|previous)(?:\.[a-zA-Z0-9_]+)*"
+    return re.sub(token_pattern, _replace_match, var_ref)
 
 
 def _resolve_variables_in_dict(
@@ -92,14 +176,14 @@ def _resolve_variables_in_dict(
     """Recursively resolves $step_X variables inside an input_data dictionary."""
     resolved: dict[str, Any] = {}
     for k, v in data.items():
-        if isinstance(v, str) and v.startswith("$"):
+        if isinstance(v, str) and "$" in v:
             resolved[k] = _lookup_variable(v, completed_steps, prev_step)
         elif isinstance(v, dict):
             resolved[k] = _resolve_variables_in_dict(v, completed_steps, prev_step)
         elif isinstance(v, list):
             resolved[k] = [
                 _lookup_variable(item, completed_steps, prev_step)
-                if isinstance(item, str) and item.startswith("$")
+                if isinstance(item, str) and "$" in item
                 else item
                 for item in v
             ]
@@ -577,9 +661,12 @@ class ExecutivePlanner:
                 prompt = (
                     f"You are the WorkOS Executive AI Operating System.\n"
                     f"The user goal was: '{plan.goal}'\n\n"
-                    f"Step Execution History:\n{steps_text}\n\n"
-                    f"Synthesize a clear, direct, professional response grounded strictly in the data above. "
-                    f"Include key metrics, extracted entities, filenames, or failure reasons if applicable."
+                    f"Step Execution History & Retrieved Findings:\n{steps_text}\n\n"
+                    f"Synthesize a clear, grounded, professional executive brief based on the data above:\n"
+                    f"1. Connect findings logically across steps (multi-hop reasoning).\n"
+                    f"2. If multiple sources or webpages present differing perspectives, compare the arguments, contrast trade-offs, and summarize the consensus.\n"
+                    f"3. Cite sources using [1], [2] referencing the source URLs or documents.\n"
+                    f"4. Format mathematical expressions with LaTeX ($...$ or $$...$$) and code with markdown code fences."
                 )
                 response_text = self.client.generate(
                     prompt=prompt,
