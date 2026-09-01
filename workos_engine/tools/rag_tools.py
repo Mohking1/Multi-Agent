@@ -263,12 +263,20 @@ class RAGToolKit:
         if Elasticsearch is None:
             return None
         try:
-            client = Elasticsearch(
-                self.es_url,
-                request_timeout=0.3,
-                max_retries=0,
-                retry_on_timeout=False,
-            )
+            kwargs: dict[str, Any] = {
+                "request_timeout": 1.0,
+                "max_retries": 1,
+                "retry_on_timeout": False,
+            }
+            if getattr(self.config, "elasticsearch_api_key", None):
+                kwargs["api_key"] = self.config.elasticsearch_api_key
+            elif getattr(self.config, "elasticsearch_password", None):
+                kwargs["basic_auth"] = (
+                    self.config.elasticsearch_username,
+                    self.config.elasticsearch_password,
+                )
+
+            client = Elasticsearch(self.es_url, **kwargs)
             if client.ping():
                 return client
         except Exception:

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WorkOS — Executive AI Operating System</title>
+  <title>WorkOS — Executive AI Cockpit</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -13,20 +13,22 @@
         extend: {
           colors: {
             brand: {
-              50: '#ecfeff',
-              500: '#06b6d4',
-              600: '#0891b2',
-              900: '#164e63',
+              cyan: '#00E5FF',
+              violet: '#8B5CF6',
+              emerald: '#10B981',
+              amber: '#F59E0B',
+              rose: '#F43F5E',
             },
-            surface: {
-              base: '#0B0F17',
-              card: '#111827',
-              cardHover: '#1F2937',
-              border: '#374151',
+            obsidian: {
+              base: '#070A0F',
+              card: '#0D1117',
+              hover: '#161B22',
+              border: '#21262D',
+              subtle: '#30363D',
             }
           },
           fontFamily: {
-            sans: ['Inter', 'system-ui', 'sans-serif'],
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
             mono: ['JetBrains Mono', 'monospace'],
           }
         }
@@ -35,79 +37,107 @@
   </script>
   <!-- Alpine.js -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <!-- FontAwesome -->
+  <!-- FontAwesome 6 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <!-- Marked for Markdown Rendering -->
+  <!-- Marked.js Markdown Engine -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-    body { font-family: 'Inter', sans-serif; background-color: #0B0F17; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #070A0F; }
     code, pre { font-family: 'JetBrains Mono', monospace; }
-    .prose-dark { color: #E5E7EB; }
-    .prose-dark h1, .prose-dark h2, .prose-dark h3 { color: #F3F4F6; font-weight: 600; margin-top: 1rem; margin-bottom: 0.5rem; }
-    .prose-dark table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.875rem; }
-    .prose-dark th, .prose-dark td { border: 1px solid #374151; padding: 0.5rem 0.75rem; text-align: left; }
-    .prose-dark th { background-color: #1F2937; color: #38BDF8; }
-    .prose-dark ul { list-style-type: disc; margin-left: 1.5rem; }
-    .prose-dark ol { list-style-type: decimal; margin-left: 1.5rem; }
-    .citation-tag { cursor: pointer; color: #38BDF8; background: rgba(56, 189, 248, 0.15); padding: 2px 6px; border-radius: 4px; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.3); transition: all 0.2s; }
-    .citation-tag:hover { background: rgba(56, 189, 248, 0.3); border-color: #38BDF8; }
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #0B0F17; }
-    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+    .prose-dark { color: #E6EDF3; }
+    .prose-dark h1, .prose-dark h2, .prose-dark h3, .prose-dark h4 { color: #F0F6FC; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.5rem; }
+    .prose-dark h2 { font-size: 1.25rem; border-bottom: 1px solid #21262D; padding-bottom: 0.35rem; }
+    .prose-dark h3 { font-size: 1.05rem; }
+    .prose-dark table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.8125rem; border-radius: 6px; overflow: hidden; }
+    .prose-dark th, .prose-dark td { border: 1px solid #21262D; padding: 0.5rem 0.75rem; text-align: left; }
+    .prose-dark th { background-color: #161B22; color: #00E5FF; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; text-transform: uppercase; }
+    .prose-dark tr:hover td { background-color: rgba(22, 27, 34, 0.5); }
+    .prose-dark ul { list-style-type: disc; margin-left: 1.25rem; margin-bottom: 0.75rem; }
+    .prose-dark ol { list-style-type: decimal; margin-left: 1.25rem; margin-bottom: 0.75rem; }
+    .prose-dark p { margin-bottom: 0.75rem; }
+    .citation-tag {
+      cursor: pointer;
+      color: #00E5FF;
+      background: rgba(0, 229, 255, 0.12);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-flex;
+      align-items: center;
+      margin: 0 2px;
+    }
+    .citation-tag:hover {
+      background: rgba(0, 229, 255, 0.25);
+      border-color: #00E5FF;
+      transform: translateY(-1px);
+      box-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
+    }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #070A0F; }
+    ::-webkit-scrollbar-thumb { background: #21262D; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #30363D; }
+    .glow-cyan { box-shadow: 0 0 15px -3px rgba(0, 229, 255, 0.25); }
+    .glow-violet { box-shadow: 0 0 15px -3px rgba(139, 92, 246, 0.25); }
   </style>
 </head>
-<body class="text-gray-100 min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-black" x-data="workosApp()">
+<body class="text-gray-200 min-h-screen flex flex-col antialiased selection:bg-brand-cyan selection:text-black" x-data="workosCockpit()">
 
-  <!-- Top Navigation Bar -->
-  <header class="border-b border-gray-800 bg-surface-card/80 backdrop-blur-md sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+  <!-- ==================== TOP NAVIGATION & TELEMETRY ==================== -->
+  <header class="border-b border-obsidian-border bg-obsidian-card/90 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+      <!-- Logo & Subsystem Pill -->
       <div class="flex items-center space-x-3">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-          <i class="fa-solid fa-cube text-black font-bold text-sm"></i>
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-cyan via-blue-600 to-brand-violet flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <i class="fa-solid fa-layer-group text-black font-bold text-sm"></i>
         </div>
         <div class="flex items-baseline space-x-2">
-          <span class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">WorkOS</span>
-          <span class="text-xs font-mono text-cyan-400/80 uppercase px-1.5 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/50">Personal OS</span>
+          <span class="font-bold text-base tracking-tight bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">WorkOS</span>
+          <span class="text-[10px] font-mono text-brand-cyan uppercase px-1.5 py-0.5 rounded bg-cyan-950/50 border border-cyan-800/40">Executive Cockpit</span>
         </div>
       </div>
 
       <!-- Navigation Tabs -->
       <nav class="hidden md:flex items-center space-x-1">
-        <button @click="activeTab = 'console'" :class="activeTab === 'console' ? 'bg-gray-800 text-cyan-400 shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'" class="px-3.5 py-1.5 rounded-md text-sm font-medium transition-all flex items-center space-x-2">
-          <i class="fa-solid fa-terminal text-xs"></i>
-          <span>Workspace</span>
+        <button @click="activeTab = 'cockpit'" :class="activeTab === 'cockpit' ? 'bg-obsidian-hover text-brand-cyan border-b-2 border-brand-cyan' : 'text-gray-400 hover:text-gray-200 hover:bg-obsidian-hover/50'" class="px-3.5 py-2 text-xs font-medium transition-all flex items-center space-x-2">
+          <i class="fa-solid fa-gauge-high text-xs"></i>
+          <span>Workspace Cockpit</span>
         </button>
-        <button @click="activeTab = 'vault'" :class="activeTab === 'vault' ? 'bg-gray-800 text-cyan-400 shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'" class="px-3.5 py-1.5 rounded-md text-sm font-medium transition-all flex items-center space-x-2">
+        <button @click="activeTab = 'vault'" :class="activeTab === 'vault' ? 'bg-obsidian-hover text-brand-cyan border-b-2 border-brand-cyan' : 'text-gray-400 hover:text-gray-200 hover:bg-obsidian-hover/50'" class="px-3.5 py-2 text-xs font-medium transition-all flex items-center space-x-2">
           <i class="fa-solid fa-vault text-xs"></i>
           <span>Document Vault</span>
-          <span class="text-xs px-1.5 py-0.2 rounded-full bg-gray-700 text-gray-300" x-text="status.documents_count"></span>
+          <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-obsidian-border text-gray-300 font-mono" x-text="status.documents_count"></span>
         </button>
-        <button @click="activeTab = 'memory'" :class="activeTab === 'memory' ? 'bg-gray-800 text-cyan-400 shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'" class="px-3.5 py-1.5 rounded-md text-sm font-medium transition-all flex items-center space-x-2">
+        <button @click="activeTab = 'memory'" :class="activeTab === 'memory' ? 'bg-obsidian-hover text-brand-cyan border-b-2 border-brand-cyan' : 'text-gray-400 hover:text-gray-200 hover:bg-obsidian-hover/50'" class="px-3.5 py-2 text-xs font-medium transition-all flex items-center space-x-2">
           <i class="fa-solid fa-brain text-xs"></i>
-          <span>Cognitive Memory</span>
+          <span>Cognitive Palace</span>
         </button>
-        <button @click="activeTab = 'mail'" :class="activeTab === 'mail' ? 'bg-gray-800 text-cyan-400 shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'" class="px-3.5 py-1.5 rounded-md text-sm font-medium transition-all flex items-center space-x-2">
+        <button @click="activeTab = 'mail'" :class="activeTab === 'mail' ? 'bg-obsidian-hover text-brand-cyan border-b-2 border-brand-cyan' : 'text-gray-400 hover:text-gray-200 hover:bg-obsidian-hover/50'" class="px-3.5 py-2 text-xs font-medium transition-all flex items-center space-x-2">
           <i class="fa-solid fa-envelope text-xs"></i>
-          <span>Mail Specialist</span>
+          <span>Mail Hub</span>
         </button>
       </nav>
 
-      <!-- Status Pills & Settings -->
+      <!-- Telemetry Controls -->
       <div class="flex items-center space-x-3">
-        <!-- Ollama Model Indicator -->
-        <div class="flex items-center space-x-2 px-2.5 py-1 rounded-full bg-gray-800/80 border border-gray-700 text-xs">
-          <span class="w-2 h-2 rounded-full" :class="status.ollama_online ? 'bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400' : 'bg-rose-500'"></span>
+        <!-- Ollama Model Selector -->
+        <div class="flex items-center space-x-2 px-2.5 py-1 rounded-md bg-obsidian-base border border-obsidian-border text-xs">
+          <span class="w-2 h-2 rounded-full" :class="status.ollama_online ? 'bg-brand-emerald animate-pulse shadow-sm shadow-emerald-400' : 'bg-brand-rose'"></span>
+          <span class="text-gray-500 font-mono text-[11px]">Ollama:</span>
           <select x-model="status.model_name" @change="switchModel($event.target.value)" class="bg-transparent border-none text-gray-200 font-mono text-xs focus:ring-0 cursor-pointer pr-1">
             <template x-for="m in status.available_models" :key="m">
-              <option :value="m" x-text="m" class="bg-gray-900 text-gray-200"></option>
+              <option :value="m" x-text="m" class="bg-obsidian-card text-gray-200"></option>
             </template>
           </select>
         </div>
 
-        <!-- Autonomy Policy Switcher -->
-        <button @click="togglePolicy()" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-medium transition-all border"
-          :class="status.autonomy_level === 'FULL' ? 'bg-emerald-950/70 text-emerald-400 border-emerald-700/60 shadow-sm shadow-emerald-900/30' : 'bg-amber-950/70 text-amber-300 border-amber-700/60'">
+        <!-- Autonomy Policy Toggle -->
+        <button @click="togglePolicy()" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-medium transition-all border"
+          :class="status.autonomy_level === 'FULL' ? 'bg-emerald-950/60 text-brand-emerald border-emerald-800/60' : 'bg-amber-950/60 text-brand-amber border-amber-800/60'">
           <i class="fa-solid" :class="status.autonomy_level === 'FULL' ? 'fa-shield-halved' : 'fa-hand'"></i>
           <span x-text="status.autonomy_level"></span>
         </button>
@@ -115,23 +145,26 @@
     </div>
   </header>
 
-  <!-- Main Content Body -->
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+  <!-- ==================== MAIN WORKSPACE ==================== -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 space-y-6">
 
-    <!-- ==================== TAB 1: EXECUTIVE WORKSPACE ==================== -->
-    <div x-show="activeTab === 'console'" class="space-y-6" x-transition>
-      <!-- Prompt & Goal Input Box -->
-      <div class="bg-surface-card border border-gray-800 rounded-xl p-5 shadow-2xl shadow-black/60 relative overflow-hidden">
-        <div class="absolute -top-24 -right-24 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
+    <!-- ==================== TAB 1: EXECUTIVE COCKPIT (SPLIT CANVAS) ==================== -->
+    <div x-show="activeTab === 'cockpit'" class="space-y-5" x-transition>
+      
+      <!-- Top Command & Directive Bar -->
+      <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-2xl relative overflow-hidden">
+        <div class="absolute -top-32 -right-32 w-80 h-80 bg-brand-cyan/5 rounded-full blur-3xl pointer-events-none"></div>
 
-        <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center justify-between mb-2.5">
           <div class="flex items-center space-x-2">
-            <i class="fa-solid fa-sparkles text-cyan-400 text-xs"></i>
+            <i class="fa-solid fa-terminal text-brand-cyan text-xs"></i>
             <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Executive Directive</span>
           </div>
-          <div class="flex items-center space-x-2 text-xs text-gray-400">
-            <span class="text-gray-500 font-mono">Specialists active:</span>
-            <span class="text-cyan-400 font-mono">mail_agent, doc_agent, rag_agent</span>
+          <div class="flex items-center space-x-3 text-xs text-gray-500 font-mono">
+            <span>Specialists:</span>
+            <span class="text-amber-400"><i class="fa-solid fa-envelope mr-1"></i>mail_agent</span>
+            <span class="text-cyan-400"><i class="fa-solid fa-file-lines mr-1"></i>doc_agent</span>
+            <span class="text-purple-400"><i class="fa-solid fa-database mr-1"></i>rag_agent</span>
           </div>
         </div>
 
@@ -139,150 +172,259 @@
           <textarea
             x-model="goalInput"
             @keydown.enter.ctrl.prevent="executeCurrentGoal()"
-            placeholder="Instruct your WorkOS (e.g. 'Search my inbox for recent invoice from Arvind, extract the line items table, and index into RAG')..."
-            rows="3"
-            class="w-full bg-gray-950/80 border border-gray-700/80 rounded-lg px-4 py-3 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 font-sans transition-all resize-none shadow-inner"
+            placeholder="Instruct WorkOS (e.g. 'Search my inbox for recent invoices from Arvind, parse the line items into tables, cross-check with security standard, and prepare brief')..."
+            rows="2"
+            class="w-full bg-obsidian-base border border-obsidian-border rounded-lg px-4 py-3 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan font-sans transition-all resize-none shadow-inner"
           ></textarea>
         </div>
 
-        <!-- Action Buttons & Suggestion Chips -->
+        <!-- Suggestion Chips & Action Triggers -->
         <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
           <div class="flex flex-wrap items-center gap-1.5">
-            <span class="text-xs text-gray-500 mr-1">Quick Directives:</span>
-            <button @click="goalInput = 'Search emails for invoice and parse attachment details'" class="text-xs px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 transition">📬 Email Invoice Search</button>
-            <button @click="goalInput = 'Summarize SOC2 security standards and provide grounded citations'" class="text-xs px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 transition">🔍 Knowledge Base RAG</button>
-            <button @click="goalInput = 'Parse uploaded document into structured markdown tables'" class="text-xs px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 transition">📄 Docling Table Extract</button>
+            <span class="text-[11px] text-gray-500 mr-1">Quick Directives:</span>
+            <button @click="goalInput = 'Search emails for invoice from Arvind and parse attachment details'" class="text-xs px-2.5 py-1 rounded bg-obsidian-hover hover:bg-obsidian-subtle text-gray-300 transition border border-obsidian-border">📬 Email Invoice Search</button>
+            <button @click="goalInput = 'Summarize SOC2 security standards and provide grounded citations'" class="text-xs px-2.5 py-1 rounded bg-obsidian-hover hover:bg-obsidian-subtle text-gray-300 transition border border-obsidian-border">🔍 Knowledge Base RAG</button>
+            <button @click="goalInput = 'Parse uploaded document into structured markdown tables'" class="text-xs px-2.5 py-1 rounded bg-obsidian-hover hover:bg-obsidian-subtle text-gray-300 transition border border-obsidian-border">📄 Docling Table Extract</button>
           </div>
 
           <div class="flex items-center space-x-2">
-            <button @click="generatePlanOnly()" :disabled="executing || !goalInput.trim()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 disabled:opacity-50 transition flex items-center space-x-2">
+            <button @click="generatePlanOnly()" :disabled="executing || !goalInput.trim()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-obsidian-hover hover:bg-obsidian-subtle text-gray-300 border border-obsidian-border disabled:opacity-50 transition flex items-center space-x-2">
               <i class="fa-solid fa-diagram-project"></i>
               <span>Preview Plan</span>
             </button>
-            <button @click="executeCurrentGoal()" :disabled="executing || !goalInput.trim()" class="px-5 py-2 text-xs font-semibold rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black shadow-lg shadow-cyan-500/20 disabled:opacity-50 transition flex items-center space-x-2 font-mono">
+            <button @click="executeCurrentGoal()" :disabled="executing || !goalInput.trim()" class="px-5 py-2 text-xs font-semibold rounded-lg bg-brand-cyan hover:bg-cyan-400 text-black shadow-lg shadow-cyan-500/20 disabled:opacity-50 transition flex items-center space-x-2 font-mono">
               <i class="fa-solid" :class="executing ? 'fa-circle-notch fa-spin' : 'fa-play'"></i>
-              <span x-text="executing ? 'Executing...' : 'Run Agent'"></span>
+              <span x-text="executing ? 'Orchestrating...' : 'Execute Directive'"></span>
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Execution DAG & Live Progress -->
-      <template x-if="activePlan && activePlan.steps">
-        <div class="bg-surface-card border border-gray-800 rounded-xl p-5 shadow-xl space-y-4">
-          <div class="flex items-center justify-between border-b border-gray-800 pb-3">
-            <div class="flex items-center space-x-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400"></span>
-              <h3 class="text-sm font-semibold text-gray-200">Execution Plan & Dynamic Task DAG</h3>
-            </div>
-            <span class="text-xs font-mono text-gray-400" x-text="`${activePlan.steps.length} Steps Orchestrated`"></span>
-          </div>
-
-          <!-- Steps Timeline Cards -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <template x-for="step in activePlan.steps" :key="step.step_id">
-              <div class="border rounded-lg p-3.5 relative overflow-hidden transition-all"
-                :class="{
-                  'border-emerald-700/60 bg-emerald-950/20': step.status === 'completed',
-                  'border-rose-700/60 bg-rose-950/20': step.status === 'failed',
-                  'border-cyan-500/80 bg-cyan-950/30 ring-1 ring-cyan-500/40': step.status === 'in_progress',
-                  'border-gray-800 bg-gray-900/60': step.status === 'pending'
-                }">
-                <div class="flex items-center justify-between mb-2">
-                  <span class="text-xs font-mono font-bold" :class="step.status === 'completed' ? 'text-emerald-400' : 'text-cyan-400'" x-text="`Step 0${step.step_id}`"></span>
-                  <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded"
-                    :class="{
-                      'bg-emerald-900/60 text-emerald-300': step.status === 'completed',
-                      'bg-rose-900/60 text-rose-300': step.status === 'failed',
-                      'bg-cyan-900/60 text-cyan-300 animate-pulse': step.status === 'in_progress',
-                      'bg-gray-800 text-gray-400': step.status === 'pending'
-                    }" x-text="step.status"></span>
+      <!-- Split Canvas: Left (60% Execution & Synthesis) | Right (40% Provenance & Evidence) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        
+        <!-- LEFT CANVAS (7 Columns): DAG & Synthesis -->
+        <div class="lg:col-span-7 space-y-5">
+          
+          <!-- Dynamic Multi-Agent DAG Visualizer -->
+          <template x-if="activePlan && activePlan.steps && activePlan.steps.length > 0">
+            <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-3.5">
+              <div class="flex items-center justify-between border-b border-obsidian-border pb-3">
+                <div class="flex items-center space-x-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-brand-cyan shadow-sm shadow-cyan-400 animate-pulse"></span>
+                  <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-300">Live Multi-Agent DAG Execution</h3>
                 </div>
-                <p class="text-xs font-medium text-gray-200 line-clamp-2" x-text="step.description"></p>
-                <div class="mt-2.5 pt-2 border-t border-gray-800/80 flex items-center justify-between text-[11px] font-mono text-gray-400">
-                  <span class="text-yellow-400" x-text="step.assigned_agent"></span>
-                  <span class="text-gray-500" x-text="step.input_data.instruction || 'execute'"></span>
-                </div>
+                <span class="text-xs font-mono text-gray-400" x-text="`${activePlan.steps.length} Steps Orchestrated`"></span>
               </div>
-            </template>
-          </div>
-        </div>
-      </template>
 
-      <!-- Grounded Synthesis Result Panel -->
-      <template x-if="executionResult">
-        <div class="bg-surface-card border border-cyan-800/50 rounded-xl p-6 shadow-2xl shadow-cyan-950/30 space-y-4">
-          <div class="flex items-center justify-between border-b border-gray-800 pb-3">
-            <div class="flex items-center space-x-2">
-              <i class="fa-solid fa-check-circle text-emerald-400"></i>
-              <h3 class="text-sm font-semibold text-gray-200">Grounded Executive Synthesis</h3>
-            </div>
-            <button @click="copySynthesis()" class="text-xs text-gray-400 hover:text-cyan-400 transition flex items-center space-x-1">
-              <i class="fa-regular fa-copy"></i>
-              <span>Copy</span>
-            </button>
-          </div>
+              <!-- Step Cards Pipeline -->
+              <div class="space-y-2.5">
+                <template x-for="(step, index) in activePlan.steps" :key="step.step_id">
+                  <div class="border rounded-lg p-3 transition-all relative overflow-hidden"
+                    :class="{
+                      'border-emerald-700/60 bg-emerald-950/20': step.status === 'completed',
+                      'border-rose-700/60 bg-rose-950/20': step.status === 'failed',
+                      'border-brand-cyan/80 bg-cyan-950/30 ring-1 ring-brand-cyan/40 glow-cyan': step.status === 'in_progress',
+                      'border-obsidian-border bg-obsidian-base/60': step.status === 'pending'
+                    }">
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center space-x-2.5">
+                        <span class="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-obsidian-card border border-obsidian-border"
+                          :class="step.status === 'completed' ? 'text-brand-emerald' : 'text-brand-cyan'"
+                          x-text="`0${step.step_id}`"></span>
+                        <span class="text-xs font-medium text-gray-100" x-text="step.description"></span>
+                      </div>
+                      
+                      <div class="flex items-center space-x-2">
+                        <!-- Agent Badge -->
+                        <span class="text-[10px] font-mono px-2 py-0.5 rounded border"
+                          :class="{
+                            'bg-amber-950/60 text-amber-300 border-amber-800/60': step.assigned_agent === 'mail_agent',
+                            'bg-cyan-950/60 text-cyan-300 border-cyan-800/60': step.assigned_agent === 'doc_agent',
+                            'bg-purple-950/60 text-purple-300 border-purple-800/60': step.assigned_agent === 'rag_agent'
+                          }" x-text="step.assigned_agent"></span>
 
-          <div class="prose-dark text-sm leading-relaxed" x-html="renderMarkdown(executionResult.final_output)"></div>
-
-          <!-- Citation Grounding Drawer -->
-          <template x-if="executionResult.citations && executionResult.citations.length > 0">
-            <div class="mt-4 pt-4 border-t border-gray-800">
-              <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2 flex items-center space-x-1.5">
-                <i class="fa-solid fa-quote-right text-cyan-400"></i>
-                <span>Referenced Evidence & Vault Citations</span>
-              </h4>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <template x-for="cit in executionResult.citations" :key="cit.citation_id">
-                  <div @click="openCitationModal(cit)" class="p-2.5 rounded-lg bg-gray-900/80 border border-gray-800 hover:border-cyan-500/50 cursor-pointer transition group">
-                    <div class="flex items-center justify-between text-xs font-mono mb-1">
-                      <span class="text-cyan-400 font-bold" x-text="cit.citation_id"></span>
-                      <span class="text-gray-400 group-hover:text-gray-200 truncate max-w-[150px]" x-text="cit.filename"></span>
+                        <!-- Status Icon -->
+                        <span class="text-xs font-mono">
+                          <i x-show="step.status === 'completed'" class="fa-solid fa-circle-check text-brand-emerald"></i>
+                          <i x-show="step.status === 'in_progress'" class="fa-solid fa-circle-notch fa-spin text-brand-cyan"></i>
+                          <i x-show="step.status === 'failed'" class="fa-solid fa-circle-xmark text-brand-rose"></i>
+                          <i x-show="step.status === 'pending'" class="fa-regular fa-circle text-gray-600"></i>
+                        </span>
+                      </div>
                     </div>
-                    <p class="text-xs text-gray-300 line-clamp-2" x-text="cit.snippet"></p>
+
+                    <!-- Variable Interpolation Payload -->
+                    <template x-if="step.input_data && Object.keys(step.input_data).length > 0">
+                      <div class="mt-2 pt-2 border-t border-obsidian-border/60 flex items-center justify-between text-[11px] font-mono text-gray-400">
+                        <span class="text-gray-500 truncate max-w-[280px]" x-text="`Input: ${JSON.stringify(step.input_data)}`"></span>
+                        <span class="text-[10px] uppercase font-semibold text-gray-400" x-text="step.status"></span>
+                      </div>
+                    </template>
                   </div>
                 </template>
               </div>
             </div>
           </template>
+
+          <!-- Grounded Executive Synthesis Brief -->
+          <template x-if="executionResult">
+            <div class="bg-obsidian-card border border-cyan-800/40 rounded-xl p-6 shadow-2xl space-y-4 glow-cyan">
+              <div class="flex items-center justify-between border-b border-obsidian-border pb-3">
+                <div class="flex items-center space-x-2">
+                  <i class="fa-solid fa-square-poll-vertical text-brand-cyan"></i>
+                  <h3 class="text-sm font-semibold text-gray-100">Grounded Executive Synthesis</h3>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <button @click="copySynthesis()" class="text-xs text-gray-400 hover:text-brand-cyan transition px-2 py-1 rounded bg-obsidian-base border border-obsidian-border flex items-center space-x-1">
+                    <i class="fa-regular fa-copy"></i>
+                    <span>Copy Brief</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Rendered Markdown Body with Citation Interceptor -->
+              <div class="prose-dark text-sm leading-relaxed" x-html="renderEnhancedMarkdown(executionResult.final_output)"></div>
+            </div>
+          </template>
+
+          <template x-if="!activePlan && !executionResult">
+            <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-12 text-center text-gray-500 space-y-2">
+              <i class="fa-solid fa-compass-drafting text-2xl text-gray-600"></i>
+              <p class="text-xs">No active execution running. Enter a directive above to orchestrate subagents.</p>
+            </div>
+          </template>
         </div>
-      </template>
+
+        <!-- RIGHT CANVAS (5 Columns): Provenance & Citation Inspector -->
+        <div class="lg:col-span-5 space-y-5">
+          
+          <!-- Selected Evidence & Citation Card -->
+          <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-obsidian-border pb-3">
+              <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-quote-right text-brand-cyan text-xs"></i>
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-300">Citation Provenance Inspector</h3>
+              </div>
+              <span class="text-[10px] font-mono text-gray-500">Side-by-Side Audit</span>
+            </div>
+
+            <!-- Active Selected Citation Details -->
+            <template x-if="selectedCitation">
+              <div class="space-y-3">
+                <div class="p-3.5 rounded-lg bg-obsidian-base border border-obsidian-border space-y-2">
+                  <div class="flex items-center justify-between text-xs font-mono">
+                    <span class="text-brand-cyan font-bold" x-text="selectedCitation.citation_id"></span>
+                    <span class="text-gray-300 font-semibold truncate max-w-[200px]" x-text="selectedCitation.filename"></span>
+                  </div>
+                  
+                  <div class="text-xs text-gray-400 font-mono text-[11px] space-y-1">
+                    <div><span class="text-gray-500">Doc ID:</span> <span class="text-gray-300" x-text="selectedCitation.doc_id"></span></div>
+                    <div><span class="text-gray-500">Score:</span> <span class="text-brand-emerald" x-text="selectedCitation.score || '1.0'"></span></div>
+                  </div>
+
+                  <!-- Extracted Snippet Quote -->
+                  <div class="p-3 rounded bg-obsidian-card border-l-2 border-brand-cyan text-xs text-gray-200 leading-relaxed italic">
+                    <span x-text="selectedCitation.snippet"></span>
+                  </div>
+                </div>
+
+                <!-- 1-Click Open Original File -->
+                <a :href="`/api/vault/${selectedCitation.doc_id}/file`" target="_blank" class="w-full py-2 px-3 rounded-lg bg-brand-cyan/10 hover:bg-brand-cyan/20 border border-brand-cyan/40 text-brand-cyan text-xs font-semibold text-center flex items-center justify-center space-x-2 transition">
+                  <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                  <span>Open Lossless Source in Vault</span>
+                </a>
+              </div>
+            </template>
+
+            <!-- All Citations List -->
+            <template x-if="executionResult && executionResult.citations && executionResult.citations.length > 0">
+              <div class="space-y-2 pt-2 border-t border-obsidian-border">
+                <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400">All Grounded Citations:</span>
+                <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                  <template x-for="cit in executionResult.citations" :key="cit.citation_id">
+                    <div @click="selectCitation(cit)" class="p-2.5 rounded-lg border cursor-pointer transition flex items-center justify-between text-xs font-mono"
+                      :class="selectedCitation && selectedCitation.citation_id === cit.citation_id ? 'bg-cyan-950/40 border-brand-cyan text-brand-cyan' : 'bg-obsidian-base border-obsidian-border text-gray-300 hover:border-gray-600'">
+                      <span class="font-bold" x-text="cit.citation_id"></span>
+                      <span class="truncate max-w-[180px] text-gray-400" x-text="cit.filename"></span>
+                      <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <template x-if="!selectedCitation && (!executionResult || !executionResult.citations || executionResult.citations.length === 0)">
+              <div class="py-8 text-center text-gray-500 space-y-1.5">
+                <i class="fa-solid fa-fingerprint text-xl text-gray-600"></i>
+                <p class="text-xs">Click on any citation tag <span class="text-brand-cyan font-mono">[1]</span> in the synthesis to inspect provenance.</p>
+              </div>
+            </template>
+          </div>
+
+          <!-- Active Cognitive Beliefs & Rules -->
+          <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-3">
+            <div class="flex items-center justify-between border-b border-obsidian-border pb-2.5">
+              <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-sliders text-brand-violet text-xs"></i>
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-300">Active Behavioral Beliefs</h3>
+              </div>
+              <span class="text-[10px] font-mono text-brand-violet">Loci Engine</span>
+            </div>
+
+            <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
+              <template x-for="b in memoryData.active_beliefs" :key="b.id">
+                <div class="p-2 rounded bg-obsidian-base border border-obsidian-border text-xs">
+                  <div class="flex items-center justify-between text-[11px] font-mono mb-1">
+                    <span class="text-yellow-400" x-text="`${b.wing}/${b.hall}`"></span>
+                    <span class="text-cyan-400" x-text="b.key"></span>
+                  </div>
+                  <p class="text-gray-300 text-[11px]" x-text="b.content"></p>
+                </div>
+              </template>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
     </div>
 
     <!-- ==================== TAB 2: DOCUMENT VAULT ==================== -->
     <div x-show="activeTab === 'vault'" class="space-y-6" x-transition>
       <!-- Upload Dropzone -->
-      <div class="bg-surface-card border-2 border-dashed border-gray-700 hover:border-cyan-500 rounded-xl p-8 text-center transition cursor-pointer"
+      <div class="bg-obsidian-card border-2 border-dashed border-obsidian-border hover:border-brand-cyan rounded-xl p-8 text-center transition cursor-pointer"
         @dragover.prevent="" @drop.prevent="handleFileDrop($event)">
         <input type="file" id="fileUploadInput" class="hidden" @change="uploadSelectedFile($event)" accept=".pdf,.docx,.txt,.md,.json">
         <label for="fileUploadInput" class="cursor-pointer space-y-3 block">
-          <div class="w-12 h-12 rounded-full bg-cyan-950/60 border border-cyan-800 flex items-center justify-center mx-auto text-cyan-400">
+          <div class="w-12 h-12 rounded-full bg-cyan-950/60 border border-brand-cyan/40 flex items-center justify-center mx-auto text-brand-cyan">
             <i class="fa-solid fa-cloud-arrow-up text-lg"></i>
           </div>
           <div>
-            <h4 class="text-sm font-semibold text-gray-200">Upload Original Document to Vault</h4>
-            <p class="text-xs text-gray-400 mt-1">PDF, DOCX, TXT, MD — Automatically converted with Docling & indexed into RAG</p>
+            <h4 class="text-sm font-semibold text-gray-100">Upload Original Source Document to Vault</h4>
+            <p class="text-xs text-gray-400 mt-1">PDF, DOCX, TXT, MD — Automatically preserved with SHA-256 and indexed into RAG</p>
           </div>
         </label>
       </div>
 
       <!-- Vault Catalog Grid -->
-      <div class="bg-surface-card border border-gray-800 rounded-xl p-5 shadow-xl space-y-4">
-        <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+      <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-4">
+        <div class="flex items-center justify-between border-b border-obsidian-border pb-3">
           <h3 class="text-sm font-semibold text-gray-200">Preserved Original Documents in Vault</h3>
-          <button @click="fetchVaultDocuments()" class="text-xs text-gray-400 hover:text-cyan-400"><i class="fa-solid fa-rotate-right mr-1"></i> Refresh</button>
+          <button @click="fetchVaultDocuments()" class="text-xs text-gray-400 hover:text-brand-cyan"><i class="fa-solid fa-rotate-right mr-1"></i> Refresh</button>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <template x-for="doc in vaultDocuments" :key="doc.doc_id">
-            <div class="border border-gray-800 rounded-lg p-4 bg-gray-900/60 hover:border-gray-700 transition flex flex-col justify-between space-y-3">
+            <div class="border border-obsidian-border rounded-lg p-4 bg-obsidian-base hover:border-obsidian-subtle transition flex flex-col justify-between space-y-3">
               <div>
                 <div class="flex items-start justify-between gap-2">
                   <div class="flex items-center space-x-2 truncate">
                     <i class="fa-solid fa-file-pdf text-rose-400 text-sm"></i>
                     <h4 class="text-xs font-semibold text-gray-100 truncate" x-text="doc.filename"></h4>
                   </div>
-                  <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-800 text-gray-400" x-text="formatBytes(doc.file_size_bytes)"></span>
+                  <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-obsidian-card text-gray-400" x-text="formatBytes(doc.file_size_bytes)"></span>
                 </div>
                 <p class="text-[11px] font-mono text-gray-500 mt-1 truncate" x-text="`ID: ${doc.doc_id}`"></p>
                 <div class="flex items-center space-x-2 mt-2 text-[11px] text-gray-400">
@@ -292,8 +434,8 @@
                 </div>
               </div>
 
-              <div class="flex items-center space-x-2 pt-2 border-t border-gray-800">
-                <a :href="`/api/vault/${doc.doc_id}/file`" target="_blank" class="flex-1 text-center py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-medium transition">
+              <div class="flex items-center space-x-2 pt-2 border-t border-obsidian-border">
+                <a :href="`/api/vault/${doc.doc_id}/file`" target="_blank" class="flex-1 text-center py-1 rounded bg-obsidian-card hover:bg-obsidian-hover text-gray-200 text-xs font-medium transition">
                   <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> View Original
                 </a>
                 <button @click="inspectParsedDoc(doc.doc_id)" class="flex-1 text-center py-1 rounded bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800 text-xs font-medium transition">
@@ -306,22 +448,22 @@
       </div>
     </div>
 
-    <!-- ==================== TAB 3: COGNITIVE MEMORY ==================== -->
+    <!-- ==================== TAB 3: COGNITIVE PALACE ==================== -->
     <div x-show="activeTab === 'memory'" class="space-y-6" x-transition>
-      <div class="bg-surface-card border border-gray-800 rounded-xl p-5 shadow-xl space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-3">
+      <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-obsidian-border pb-3">
           <div>
-            <h3 class="text-sm font-semibold text-gray-200">Cognitive Memory Inspector (Hindsight + MemPalace)</h3>
-            <p class="text-xs text-gray-400 mt-0.5">4 Structured Networks: Facts, Experiences, Entities, and Evolving Beliefs</p>
+            <h3 class="text-sm font-semibold text-gray-200">Cognitive Memory Palace (4-Network Engine)</h3>
+            <p class="text-xs text-gray-400 mt-0.5">Facts, Experiences, Entities, and Evolving Beliefs</p>
           </div>
           <div class="relative w-64">
             <input type="text" x-model="memorySearchQuery" @input.debounce.300ms="searchMemory()" placeholder="Search memory (FTS5 BM25)..."
-              class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-cyan-500">
+              class="w-full bg-obsidian-base border border-obsidian-border rounded-lg px-3 py-1.5 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-brand-cyan">
           </div>
         </div>
 
         <!-- Spatial Loci Context Banner -->
-        <div class="p-3.5 rounded-lg bg-gray-950/80 border border-gray-800 font-mono text-xs text-cyan-300 leading-relaxed overflow-x-auto">
+        <div class="p-3.5 rounded-lg bg-obsidian-base border border-obsidian-border font-mono text-xs text-brand-cyan leading-relaxed overflow-x-auto">
           <div class="text-gray-500 text-[10px] uppercase font-bold mb-1">Spatial Loci Index (< 150 tokens)</div>
           <div x-text="memoryData.spatial_summary || 'No memory loci loaded.'"></div>
         </div>
@@ -330,17 +472,17 @@
         <div class="space-y-2">
           <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-400">Active User Beliefs & Preferences</h4>
           <div class="overflow-x-auto">
-            <table class="w-full text-xs text-left text-gray-300 border border-gray-800 rounded-lg">
-              <thead class="bg-gray-900 text-gray-400 uppercase text-[10px] font-mono border-b border-gray-800">
+            <table class="w-full text-xs text-left text-gray-300 border border-obsidian-border rounded-lg">
+              <thead class="bg-obsidian-base text-gray-400 uppercase text-[10px] font-mono border-b border-obsidian-border">
                 <tr>
                   <th class="px-4 py-2">Locus</th>
                   <th class="px-4 py-2">Rule Key</th>
                   <th class="px-4 py-2">Behavioral Rule / Fact</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-800">
+              <tbody class="divide-y divide-obsidian-border">
                 <template x-for="b in (memorySearchResults.length ? memorySearchResults : memoryData.active_beliefs)" :key="b.id">
-                  <tr class="hover:bg-gray-900/50">
+                  <tr class="hover:bg-obsidian-base/60">
                     <td class="px-4 py-2.5 font-mono text-yellow-400" x-text="`${b.wing}/${b.hall}`"></td>
                     <td class="px-4 py-2.5 font-mono text-cyan-400" x-text="b.key"></td>
                     <td class="px-4 py-2.5 text-gray-200" x-text="b.content"></td>
@@ -353,20 +495,20 @@
       </div>
     </div>
 
-    <!-- ==================== TAB 4: MAIL SPECIALIST ==================== -->
+    <!-- ==================== TAB 4: MAIL HUB ==================== -->
     <div x-show="activeTab === 'mail'" class="space-y-6" x-transition>
-      <div class="bg-surface-card border border-gray-800 rounded-xl p-5 shadow-xl space-y-4">
-        <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+      <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-4">
+        <div class="flex items-center justify-between border-b border-obsidian-border pb-3">
           <div>
             <h3 class="text-sm font-semibold text-gray-200">Autonomous Email Dispatch & Inbox Triage</h3>
-            <p class="text-xs text-gray-400 mt-0.5">Policy Status: <span class="font-mono text-cyan-400 font-bold" x-text="status.autonomy_level"></span></p>
+            <p class="text-xs text-gray-400 mt-0.5">Policy Status: <span class="font-mono text-brand-cyan font-bold" x-text="status.autonomy_level"></span></p>
           </div>
-          <button @click="fetchMailInbox()" class="text-xs text-gray-400 hover:text-cyan-400"><i class="fa-solid fa-rotate-right mr-1"></i> Fetch Inbox</button>
+          <button @click="fetchMailInbox()" class="text-xs text-gray-400 hover:text-brand-cyan"><i class="fa-solid fa-rotate-right mr-1"></i> Fetch Inbox</button>
         </div>
 
         <div class="space-y-3">
           <template x-for="mail in inboxEmails" :key="mail.uid || mail.subject">
-            <div class="p-3.5 rounded-lg bg-gray-900/60 border border-gray-800 hover:border-gray-700 transition space-y-1">
+            <div class="p-3.5 rounded-lg bg-obsidian-base border border-obsidian-border hover:border-obsidian-subtle transition space-y-1">
               <div class="flex items-center justify-between text-xs">
                 <span class="font-semibold text-gray-200" x-text="mail.sender"></span>
                 <span class="text-gray-500 font-mono text-[11px]" x-text="mail.date || 'Recent'"></span>
@@ -386,8 +528,8 @@
 
   <!-- Modal for Document Parsed Preview -->
   <div x-show="previewModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" style="display: none;" x-transition>
-    <div class="bg-surface-card border border-gray-700 rounded-xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden" @click.away="previewModalOpen = false">
-      <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+    <div class="bg-obsidian-card border border-obsidian-border rounded-xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden" @click.away="previewModalOpen = false">
+      <div class="px-6 py-4 border-b border-obsidian-border flex items-center justify-between">
         <h3 class="text-sm font-semibold text-gray-100" x-text="previewModalTitle"></h3>
         <button @click="previewModalOpen = false" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
       </div>
@@ -396,13 +538,14 @@
   </div>
 
   <script>
-    function workosApp() {
+    function workosCockpit() {
       return {
-        activeTab: 'console',
+        activeTab: 'cockpit',
         goalInput: '',
         executing: false,
         activePlan: null,
         executionResult: null,
+        selectedCitation: null,
         status: {
           version: '1.0.0',
           model_name: 'hf.co/unsloth/SmolLM3-3B-GGUF:UD-Q6_K_XL',
@@ -424,6 +567,16 @@
           this.fetchStatus();
           this.fetchVaultDocuments();
           this.fetchMemoryData();
+
+          // Global click listener for citation tags [1], [2] inside rendered Markdown
+          window.handleCitationClick = (citationId) => {
+            if (this.executionResult && this.executionResult.citations) {
+              const match = this.executionResult.citations.find(c => c.citation_id === citationId || c.citation_id === `[${citationId}]`);
+              if (match) {
+                this.selectCitation(match);
+              }
+            }
+          };
         },
 
         async fetchStatus() {
@@ -480,6 +633,7 @@
           if (!this.goalInput.trim() || this.executing) return;
           this.executing = true;
           this.executionResult = null;
+          this.selectedCitation = null;
 
           try {
             const res = await fetch('/api/execute', {
@@ -490,6 +644,9 @@
             const data = await res.json();
             this.activePlan = { goal: data.goal, steps: data.steps };
             this.executionResult = data;
+            if (data.citations && data.citations.length > 0) {
+              this.selectedCitation = data.citations[0];
+            }
             this.fetchStatus();
             this.fetchVaultDocuments();
           } catch (e) {
@@ -497,6 +654,10 @@
           } finally {
             this.executing = false;
           }
+        },
+
+        selectCitation(cit) {
+          this.selectedCitation = cit;
         },
 
         async fetchVaultDocuments() {
@@ -519,12 +680,6 @@
           } catch (e) {
             console.error('Error inspecting doc:', e);
           }
-        },
-
-        openCitationModal(cit) {
-          this.previewModalTitle = `Citation Source: ${cit.filename} (${cit.citation_id})`;
-          this.previewModalContent = `### Citation Snippet:\n> ${cit.snippet}\n\n**Document ID**: \`${cit.doc_id}\`\n**Vault Location**: \`${cit.vault_path}\`\n\n[Open Full Original Document](/api/vault/${cit.doc_id}/file)`;
-          this.previewModalOpen = true;
         },
 
         async handleFileDrop(e) {
@@ -585,6 +740,16 @@
         renderMarkdown(md) {
           if (!md) return '';
           return marked.parse(md);
+        },
+
+        renderEnhancedMarkdown(md) {
+          if (!md) return '';
+          let html = marked.parse(md);
+          // Replace [1], [2], etc. with interactive clickable citation badges
+          html = html.replace(/\[(\d+)\]/g, (match, num) => {
+            return `<span class="citation-tag" onclick="window.handleCitationClick('[${num}]')">[${num}]</span>`;
+          });
+          return html;
         },
 
         copySynthesis() {

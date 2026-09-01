@@ -9,3 +9,4 @@ data/
 *.db
 .superpowers/
 .pytest_cache/
+.agents/
