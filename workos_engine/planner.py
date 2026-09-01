@@ -295,25 +295,25 @@ class ExecutivePlanner:
         return registry
 
     def _generate_plan(self, goal: str, context: str | None = None) -> ExecutionPlan:
-        """
-        Internal implementation of dynamic multi-step ExecutionPlan construction.
-        """
+        """Internal implementation of dynamic multi-step ExecutionPlan construction."""
         ctx_text = context if context is not None else self.build_planning_context(goal)
-        tool_registry = self._collect_subagent_tool_registry()
-
-        tools_json = json.dumps(tool_registry, indent=2)
 
         prompt = (
-            f"You are the WorkOS Executive AI Planner. Formulate an optimal, step-by-step execution plan to accomplish the user goal.\n\n"
-            f"Goal: {goal}\n\n"
-            f"Available Subagent Tools Registry:\n{tools_json}\n\n"
+            f"You are the WorkOS Executive AI Planner. Break down the user's goal into a structured sequential multi-agent execution plan.\n\n"
+            f"User Goal: '{goal}'\n\n"
+            f"Available Specialists:\n"
+            f"- 'mail_agent': Search, read, fetch, and inspect emails in the user's inbox.\n"
+            f"- 'web_agent': Search the live internet, check online websites/forums/timelines, extract articles with citations.\n"
+            f"- 'doc_agent': Parse PDF/DOCX/image files and extract tables with TableFormer.\n"
+            f"- 'rag_agent': Search internal knowledge base and parent-child document chunks.\n\n"
             f"Cognitive Context & Memory:\n{ctx_text}\n\n"
-            f"Rules:\n"
-            f"1. Choose assigned_agent from: ['mail_agent', 'doc_agent', 'rag_agent', 'web_agent'].\n"
-            f"2. In input_data, specify the 'instruction' (matching one of the agent's tool names or capabilities) and all required tool parameters.\n"
-            f"3. You can reference outputs of previous steps using variable interpolation like '$step_1.saved_path' or '$step_1.doc_id'.\n"
-            f"4. For live internet searches, external research, or online facts, assign to 'web_agent' with instruction 'web_search' or 'web_research_and_ingest'.\n"
-            f"5. Output MUST strictly be valid JSON with keys: 'goal' and 'steps' (array of objects with 'step_id', 'description', 'assigned_agent', 'input_data')."
+            f"Planning Rules:\n"
+            f"1. If the goal requires checking inbox/emails AND searching online, you MUST create separate steps for 'mail_agent' and 'web_agent'.\n"
+            f"2. You can reference outputs of previous steps using variable interpolation like '$step_1.saved_path' or '$step_1.results'.\n"
+            f"3. Return strictly valid JSON in this exact structure:\n"
+            f'{{\n  "goal": "{goal}",\n  "steps": [\n'
+            f'    {{"step_id": 1, "assigned_agent": "<agent_name>", "description": "<concise step description>", "input_data": {{"query": "<search or mission details>"}}}}\n'
+            f"  ]\n}}"
         )
 
         if self.client and hasattr(self.client, "generate"):
@@ -456,13 +456,45 @@ class ExecutivePlanner:
         step_id = 1
 
         is_email_search = any(
-            w in goal_lower for w in ["email", "mail", "inbox", "sender", "arvind", "find invoice"]
+            w in goal_lower
+            for w in [
+                "email",
+                "mail",
+                "inbox",
+                "sender",
+                "arvind",
+                "find invoice",
+                "dresden",
+                "fau",
+                "dortmund",
+                "university",
+            ]
+        )
+        is_web_search = any(
+            w in goal_lower
+            for w in [
+                "search online",
+                "search web",
+                "check online",
+                "web",
+                "internet",
+                "google",
+                "lookup online",
+                "latest",
+                "news",
+                "website",
+                "traffic",
+                "timeline",
+                "approx when",
+                "http",
+                "url",
+            ]
         )
         is_doc_parse = any(
             w in goal_lower
             for w in ["pdf", "invoice", "doc", "document", "parse", "table", "chunk"]
         )
-        is_rag_or_search = any(
+        is_rag = any(
             w in goal_lower for w in ["rag", "index", "knowledge", "hybrid", "search knowledge"]
         )
 
@@ -488,18 +520,6 @@ class ExecutivePlanner:
                 )
             )
             step_id += 1
-            if is_rag_or_search:
-                steps.append(
-                    PlanStep(
-                        step_id=step_id,
-                        description="Index parsed content into RAG knowledge base",
-                        assigned_agent="rag_agent",
-                        input_data={
-                            "instruction": "rag_ingest_pdf",
-                            "file_path": "$step_1.saved_path",
-                        },
-                    )
-                )
         elif is_email_search:
             if "send" in goal_lower or "draft" in goal_lower:
                 instruction = "send_email" if "send" in goal_lower else "create_draft"
@@ -515,16 +535,30 @@ class ExecutivePlanner:
                         },
                     )
                 )
+                step_id += 1
             else:
                 steps.append(
                     PlanStep(
                         step_id=step_id,
-                        description="Search emails",
+                        description="Search and inspect inbox emails",
                         assigned_agent="mail_agent",
-                        input_data={"instruction": "search_emails", "text": goal},
+                        input_data={"query": goal},
                     )
                 )
-        elif is_doc_parse:
+                step_id += 1
+
+        if is_web_search:
+            steps.append(
+                PlanStep(
+                    step_id=step_id,
+                    description="Search live web and research latest online intelligence",
+                    assigned_agent="web_agent",
+                    input_data={"instruction": "web_research_and_ingest", "query": goal},
+                )
+            )
+            step_id += 1
+
+        if is_doc_parse and not is_email_search:
             steps.append(
                 PlanStep(
                     step_id=step_id,
@@ -533,31 +567,9 @@ class ExecutivePlanner:
                     input_data={"instruction": "parse_document", "file_path": goal},
                 )
             )
-        elif any(
-            w in goal_lower
-            for w in [
-                "search online",
-                "search web",
-                "web",
-                "internet",
-                "google",
-                "lookup online",
-                "latest",
-                "news",
-                "website",
-                "http",
-                "url",
-            ]
-        ):
-            steps.append(
-                PlanStep(
-                    step_id=step_id,
-                    description="Search live web and research topic",
-                    assigned_agent="web_agent",
-                    input_data={"instruction": "web_research_and_ingest", "query": goal},
-                )
-            )
-        else:
+            step_id += 1
+
+        if is_rag or not steps:
             steps.append(
                 PlanStep(
                     step_id=step_id,
@@ -566,6 +578,7 @@ class ExecutivePlanner:
                     input_data={"instruction": "rag_ask", "query": goal},
                 )
             )
+            step_id += 1
 
         return ExecutionPlan(goal=goal, steps=steps)
 
