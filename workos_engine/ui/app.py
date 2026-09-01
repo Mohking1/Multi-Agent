@@ -385,21 +385,30 @@ async def upload_document_to_vault(
 @app.get("/api/mail/inbox")
 async def get_mail_inbox(query: str | None = None):
     """Searches or fetches emails from the Mail Specialist agent."""
-    res = planner.mail_agent.toolkit.search_emails(text=query or "")
-    return {"emails": res.get("emails", []), "count": res.get("count", 0)}
+    try:
+        res = planner.mail_agent.toolkit.search_emails(text=query or "")
+        emails = res if isinstance(res, list) else res.get("emails", [])
+        return {"emails": emails, "count": len(emails)}
+    except Exception as e:
+        logger.warning(f"Failed to fetch mail inbox: {e}")
+        return {"emails": [], "count": 0, "error": str(e)}
 
 
 @app.post("/api/mail/send")
 async def send_mail_endpoint(req: EmailSendRequest):
     """Dispatches or stages an outbound email through the MailAgent policy gate."""
-    res = planner.mail_agent.execute_send(
-        to_email=req.to_email,
-        subject=req.subject,
-        body=req.body,
-        cc=req.cc,
-        bcc=req.bcc,
-    )
-    return res
+    try:
+        res = planner.mail_agent.execute_send(
+            to_email=req.to_email,
+            subject=req.subject,
+            body=req.body,
+            cc=req.cc,
+            bcc=req.bcc,
+        )
+        return res
+    except Exception as e:
+        logger.error(f"Failed to send email: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 def create_ui_app() -> FastAPI:
