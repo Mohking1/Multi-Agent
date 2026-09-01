@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import urllib.parse
 from typing import Any
 
 import httpx
+from bs4 import BeautifulSoup
 
 try:
     import trafilatura
@@ -86,7 +88,42 @@ class WebToolKit:
         except Exception as e:
             logger.debug(f"SearXNG search unavailable ({e}), falling back to DDGS.")
 
-        # 2. Fallback: DuckDuckGo Search (Zero-Cloud / No API key)
+        # 2. Try direct HTML search engine
+        try:
+            url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query_str)}"
+            resp = self.http_client.get(url, timeout=6.0)
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, "html.parser")
+                cleaned = []
+                for idx, r in enumerate(soup.find_all("div", class_="result"), 1):
+                    title_a = r.find("a", class_="result__a")
+                    snippet_tag = r.find("a", class_="result__snippet")
+                    if title_a and title_a.get("href"):
+                        href = title_a["href"]
+                        if "uddg=" in href:
+                            parsed_href = urllib.parse.parse_qs(
+                                urllib.parse.urlparse(href).query
+                            ).get("uddg", [href])[0]
+                        else:
+                            parsed_href = href
+                        cleaned.append(
+                            {
+                                "title": title_a.get_text(strip=True),
+                                "url": parsed_href,
+                                "snippet": snippet_tag.get_text(strip=True) if snippet_tag else "",
+                                "engine": "duckduckgo_html",
+                                "score": 1.0 / idx,
+                            }
+                        )
+                        if len(cleaned) >= num_results:
+                            break
+                if cleaned:
+                    logger.info(f"Direct web search returned {len(cleaned)} results.")
+                    return cleaned
+        except Exception as e:
+            logger.debug(f"Direct HTML search failed: {e}")
+
+        # 3. Fallback: DDGS library
         if DDGS is not None:
             try:
                 with DDGS() as ddgs:
@@ -102,10 +139,10 @@ class WebToolKit:
                                 "score": 1.0 / idx,
                             }
                         )
-                    logger.info(f"DuckDuckGo fallback search returned {len(cleaned)} results.")
-                    return cleaned
+                    if cleaned:
+                        return cleaned
             except Exception as e:
-                logger.warning(f"DuckDuckGo fallback search failed: {e}")
+                logger.warning(f"DDGS library search failed: {e}")
 
         return []
 

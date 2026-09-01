@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 import uuid
 from typing import Any
@@ -6,6 +7,8 @@ from typing import Any
 from workos_engine.memory.db import MemoryDB
 from workos_engine.memory.loci import SpatialLociManager
 from workos_engine.types import MemoryItem, MemoryNetwork
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryReflector:
@@ -207,18 +210,33 @@ Return ONLY valid JSON array with objects matching:
             resp_text = re.sub(r"\n?```$", "", resp_text)
 
         parsed = json.loads(resp_text)
-        items: list[MemoryItem] = []
-        for p in parsed:
-            items.append(
-                MemoryItem(
-                    id=f"mem_{uuid.uuid4().hex[:12]}",
-                    network=MemoryNetwork(p["network"]),
-                    wing=p.get("wing", "general"),
-                    hall=p.get("hall", "general"),
-                    key=p.get("key", "item"),
-                    content=p.get("content", ""),
-                    confidence=float(p.get("confidence", 1.0)),
-                    metadata=p.get("metadata", {}),
-                )
+        if isinstance(parsed, dict):
+            parsed_list = (
+                parsed.get("memories") or parsed.get("items") or parsed.get("data") or [parsed]
             )
+        elif isinstance(parsed, list):
+            parsed_list = parsed
+        else:
+            parsed_list = []
+
+        items: list[MemoryItem] = []
+        for p in parsed_list:
+            if not isinstance(p, dict) or "network" not in p:
+                continue
+            try:
+                network_val = p["network"].lower().strip()
+                items.append(
+                    MemoryItem(
+                        id=f"mem_{uuid.uuid4().hex[:12]}",
+                        network=MemoryNetwork(network_val),
+                        wing=p.get("wing", "general"),
+                        hall=p.get("hall", "general"),
+                        key=p.get("key", "item"),
+                        content=p.get("content", ""),
+                        confidence=float(p.get("confidence", 1.0)),
+                        metadata=p.get("metadata", {}),
+                    )
+                )
+            except Exception as e:
+                logger.debug(f"Skipping invalid memory item {p}: {e}")
         return items

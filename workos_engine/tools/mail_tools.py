@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 import smtplib
 from datetime import date, datetime
 from email.message import EmailMessage
@@ -75,6 +76,36 @@ class MailToolKit:
         if search_text:
             criteria["text"] = search_text
 
+        def _format_msg_dict(msg: Any) -> dict[str, Any]:
+            flags = list(getattr(msg, "flags", ()) or ())
+            is_seen = "\\Seen" in flags or "SEEN" in flags
+            attachments = getattr(msg, "attachments", []) or []
+            body_snippet = (getattr(msg, "text", "") or getattr(msg, "html", "") or "").strip()[
+                :300
+            ]
+            msg_date = getattr(msg, "date", None)
+            date_str = (
+                msg_date.isoformat()
+                if isinstance(msg_date, (datetime, date))
+                else str(msg_date)
+                if msg_date
+                else None
+            )
+            return {
+                "uid": getattr(msg, "uid", ""),
+                "subject": getattr(msg, "subject", "") or "",
+                "from": getattr(msg, "from_", "") or "",
+                "to": list(getattr(msg, "to", ()) or ()),
+                "cc": list(getattr(msg, "cc", ()) or ()),
+                "bcc": list(getattr(msg, "bcc", ()) or ()),
+                "date": date_str,
+                "flags": flags,
+                "seen": is_seen,
+                "size": getattr(msg, "size", 0),
+                "has_attachments": len(attachments) > 0,
+                "snippet": body_snippet,
+            }
+
         results: list[dict[str, Any]] = []
         try:
             with self._get_mailbox(folder=folder) as mailbox:
@@ -83,39 +114,26 @@ class MailToolKit:
                     mailbox.fetch(imap_query, limit=limit, reverse=True, mark_seen=False)
                 )
 
+                # If exact phrase match returned no results, search distinct keywords
+                if not messages and search_text:
+                    terms = [
+                        w.strip() for w in re.split(r"[\s,]+", search_text) if len(w.strip()) >= 3
+                    ]
+                    if len(terms) > 1:
+                        seen_uids = set()
+                        for t in terms:
+                            term_criteria = dict(criteria)
+                            term_criteria["text"] = t
+                            for msg in mailbox.fetch(
+                                AND(**term_criteria), limit=limit, reverse=True, mark_seen=False
+                            ):
+                                uid = getattr(msg, "uid", "")
+                                if uid not in seen_uids:
+                                    seen_uids.add(uid)
+                                    messages.append(msg)
+
                 for msg in messages:
-                    flags = list(getattr(msg, "flags", ()) or ())
-                    is_seen = "\\Seen" in flags or "SEEN" in flags
-                    attachments = getattr(msg, "attachments", []) or []
-                    body_snippet = (
-                        getattr(msg, "text", "") or getattr(msg, "html", "") or ""
-                    ).strip()[:300]
-
-                    msg_date = getattr(msg, "date", None)
-                    date_str = (
-                        msg_date.isoformat()
-                        if isinstance(msg_date, (datetime, date))
-                        else str(msg_date)
-                        if msg_date
-                        else None
-                    )
-
-                    results.append(
-                        {
-                            "uid": getattr(msg, "uid", ""),
-                            "subject": getattr(msg, "subject", "") or "",
-                            "from": getattr(msg, "from_", "") or "",
-                            "to": list(getattr(msg, "to", ()) or ()),
-                            "cc": list(getattr(msg, "cc", ()) or ()),
-                            "bcc": list(getattr(msg, "bcc", ()) or ()),
-                            "date": date_str,
-                            "flags": flags,
-                            "seen": is_seen,
-                            "size": getattr(msg, "size", 0),
-                            "has_attachments": len(attachments) > 0,
-                            "snippet": body_snippet,
-                        }
-                    )
+                    results.append(_format_msg_dict(msg))
         except Exception as e:
             logger.warning(f"IMAP search error: {e}")
 

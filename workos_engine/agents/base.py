@@ -3,6 +3,7 @@
 import json
 import logging
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Any
 
 from config import WorkOSConfig, get_config
@@ -130,9 +131,11 @@ class BaseSubagent(ABC):
         artifacts: list[str] = []
         accumulated_data: list[Any] = []
 
+        today_str = datetime.now().strftime("%Y-%m-%d")
         system_prompt = (
             f"You are the {self.name} for the WorkOS operating system.\n"
-            f"Role: {self.description}\n\n"
+            f"Role: {self.description}\n"
+            f"Current System Date: {today_str}\n\n"
             f"You have access ONLY to the following tools:\n{tools_summary}\n\n"
             f"Your job is to accomplish the assigned mission by calling the available tools sequentially.\n"
             f"Respond ONLY in valid JSON with one of the following formats:\n"
@@ -197,12 +200,33 @@ class BaseSubagent(ABC):
             else:
                 history.append(f"Step {iteration}: No valid action recognized.")
 
-        # Fallback if max iterations reached without explicit finish
-        summary = f"Completed {len(history)} execution steps for mission: {mission}"
+        # Final consolidation of findings from gathered tool observations
+        findings = ""
+        if accumulated_data and self.model_client and hasattr(self.model_client, "generate"):
+            try:
+                obs_summary_prompt = (
+                    f"Mission: '{mission}'\n\n"
+                    f"Observed Results from Tool Calls:\n"
+                    + "\n".join(history)
+                    + "\n\nSynthesize your final findings based strictly on the observations above."
+                )
+                summary_res = self.model_client.generate(
+                    prompt=obs_summary_prompt,
+                    system=f"You are the {self.name}. Summarize your findings based ONLY on your tool observations.",
+                    temperature=0.1,
+                )
+                if summary_res:
+                    findings = summary_res.strip()
+            except Exception as e:
+                logger.debug(f"[{self.name}] Error consolidating findings: {e}")
+
+        if not findings:
+            findings = f"Completed {len(history)} execution steps for mission: {mission}"
+
         return ExecutionResult(
             task_id=task.task_id,
             agent_name=self.name,
             success=True,
-            data={"findings": summary, "steps": history, "details": accumulated_data},
+            data={"findings": findings, "steps": history, "details": accumulated_data},
             artifacts=artifacts,
         )

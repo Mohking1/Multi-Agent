@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import uuid
+from datetime import datetime
 from typing import Any
 
 from config import WorkOSConfig, get_config
@@ -249,9 +250,17 @@ class ExecutivePlanner:
         Gathers active beliefs and relevant recalled domain facts/entities
         to build a compact, clean context prompt for planning.
         """
-        parts = []
+        parts = [f"Current System Date: {datetime.now().strftime('%Y-%m-%d')}"]
 
-        # 1. Active beliefs and preferences
+        # 1. Spatial index summary
+        try:
+            summary = self.memory.get_context_index_summary()
+            if summary:
+                parts.append(f"Spatial Memory Loci Index:\n{summary}")
+        except Exception as e:
+            logger.debug(f"Error getting spatial summary: {e}")
+
+        # 2. Active beliefs and preferences
         try:
             active_beliefs = self.memory.get_active_beliefs()
             if active_beliefs:
@@ -531,7 +540,18 @@ class ExecutivePlanner:
             )
             if s.result:
                 if s.result.success:
-                    status_str += f"\nData: {s.result.data}"
+                    if isinstance(s.result.data, dict):
+                        findings = s.result.data.get("findings") or ""
+                        steps_log = s.result.data.get("steps") or []
+                        if findings:
+                            status_str += f"\nFindings: {findings}"
+                        if steps_log:
+                            status_str += "\nObserved Details:\n" + "\n".join(
+                                f"  - {st}" for st in steps_log
+                            )
+                    else:
+                        status_str += f"\nData: {str(s.result.data)[:1000]}"
+
                     if s.result.artifacts:
                         status_str += f"\nArtifacts: {s.result.artifacts}"
                 else:
@@ -544,8 +564,10 @@ class ExecutivePlanner:
             raise RuntimeError("No active LLM client configured for ExecutivePlanner synthesis.")
 
         try:
+            today_str = datetime.now().strftime("%Y-%m-%d")
             prompt = (
                 f"You are the WorkOS Executive AI Operating System.\n"
+                f"Current System Date: {today_str}\n"
                 f"The user goal was: '{plan.goal}'\n\n"
                 f"Step Execution History & Retrieved Findings:\n{steps_text}\n\n"
                 f"Synthesize a clear, strictly grounded, professional executive brief based on the data above:\n"

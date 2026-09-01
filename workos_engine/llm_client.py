@@ -19,7 +19,7 @@ class OllamaClient:
         base_url: str = "http://localhost:11434",
         default_model: str = "hf.co/unsloth/SmolLM3-3B-GGUF:UD-Q6_K_XL",
         embedding_model: str = "bge-m3:latest",
-        timeout: float = 120.0,
+        timeout: float = 300.0,
     ):
         self.base_url = base_url.rstrip("/")
         self.default_model = default_model
