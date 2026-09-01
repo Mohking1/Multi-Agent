@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import urllib.parse
 from typing import Any
 
 import httpx
@@ -108,15 +107,7 @@ class WebToolKit:
             except Exception as e:
                 logger.warning(f"DuckDuckGo fallback search failed: {e}")
 
-        return [
-            {
-                "title": f"Search simulation for '{query_str}'",
-                "url": f"https://duckduckgo.com/?q={urllib.parse.quote(query_str)}",
-                "snippet": f"No active search engines reached. Verify SearXNG is running on {searx_url}.",
-                "engine": "offline",
-                "score": 0.0,
-            }
-        ]
+        return []
 
     def fetch_page_content(self, url: str) -> dict[str, Any]:
         """

@@ -33,10 +33,7 @@ class MemoryReflector:
         extracted_items: list[MemoryItem] = []
 
         if model_client is not None:
-            try:
-                extracted_items = self._reflect_with_model(conversation_events, model_client)
-            except Exception:
-                extracted_items = self._reflect_heuristically(conversation_events)
+            extracted_items = self._reflect_with_model(conversation_events, model_client)
         else:
             extracted_items = self._reflect_heuristically(conversation_events)
 

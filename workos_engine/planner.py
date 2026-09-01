@@ -316,22 +316,22 @@ class ExecutivePlanner:
             f"  ]\n}}"
         )
 
-        if self.client and hasattr(self.client, "generate"):
-            try:
-                response_text = self.client.generate(
-                    prompt=prompt,
-                    model=self.config.model_name,
-                    format="json",
-                    temperature=0.1,
-                )
-                if response_text:
-                    return self._parse_plan_json(response_text, fallback_goal=goal)
-            except Exception as e:
-                logger.warning(
-                    f"Ollama plan generation failed: {e}. Falling back to heuristic planner."
-                )
+        if not self.client or not hasattr(self.client, "generate"):
+            raise RuntimeError("No active LLM client configured for ExecutivePlanner.")
 
-        return self._heuristic_plan_fallback(goal)
+        try:
+            response_text = self.client.generate(
+                prompt=prompt,
+                model=self.config.model_name,
+                format="json",
+                temperature=0.1,
+            )
+            if response_text:
+                return self._parse_plan_json(response_text, fallback_goal=goal)
+            raise RuntimeError("Ollama returned empty plan response.")
+        except Exception as e:
+            logger.error(f"Ollama plan generation failed: {e}")
+            raise RuntimeError(f"Ollama plan generation failed: {e}") from e
 
     def generate_plan(self, goal: str, context: str | None = None) -> ExecutionPlan:
         """
@@ -371,9 +371,6 @@ class ExecutivePlanner:
         elif isinstance(data, dict):
             goal = data.get("goal", fallback_goal)
             raw_steps = data.get("steps", [])
-        else:
-            return self._heuristic_plan_fallback(fallback_goal)
-
         if isinstance(raw_steps, dict):
             raw_steps = [raw_steps]
         elif not isinstance(raw_steps, list):
@@ -445,140 +442,9 @@ class ExecutivePlanner:
             )
 
         if not steps:
-            return self._heuristic_plan_fallback(fallback_goal)
-
-        return ExecutionPlan(goal=goal, steps=steps)
-
-    def _heuristic_plan_fallback(self, goal: str) -> ExecutionPlan:
-        """Rule-based heuristic plan generator when LLM is offline or in mock environment."""
-        goal_lower = goal.lower()
-        steps = []
-        step_id = 1
-
-        is_email_search = any(
-            w in goal_lower
-            for w in [
-                "email",
-                "mail",
-                "inbox",
-                "sender",
-                "arvind",
-                "find invoice",
-                "dresden",
-                "fau",
-                "dortmund",
-                "university",
-            ]
-        )
-        is_web_search = any(
-            w in goal_lower
-            for w in [
-                "search online",
-                "search web",
-                "check online",
-                "web",
-                "internet",
-                "google",
-                "lookup online",
-                "latest",
-                "news",
-                "website",
-                "traffic",
-                "timeline",
-                "approx when",
-                "http",
-                "url",
-            ]
-        )
-        is_doc_parse = any(
-            w in goal_lower
-            for w in ["pdf", "invoice", "doc", "document", "parse", "table", "chunk"]
-        )
-        is_rag = any(
-            w in goal_lower for w in ["rag", "index", "knowledge", "hybrid", "search knowledge"]
-        )
-
-        if is_email_search and is_doc_parse:
-            steps.append(
-                PlanStep(
-                    step_id=step_id,
-                    description="Search and download attachment from email",
-                    assigned_agent="mail_agent",
-                    input_data={"instruction": "download_attachment", "query": goal},
-                )
+            raise RuntimeError(
+                f"Ollama returned plan JSON with no valid steps: {response_text[:300]}"
             )
-            step_id += 1
-            steps.append(
-                PlanStep(
-                    step_id=step_id,
-                    description="Parse downloaded document",
-                    assigned_agent="doc_agent",
-                    input_data={
-                        "instruction": "parse_document",
-                        "file_path": "$step_1.saved_path",
-                    },
-                )
-            )
-            step_id += 1
-        elif is_email_search:
-            if "send" in goal_lower or "draft" in goal_lower:
-                instruction = "send_email" if "send" in goal_lower else "create_draft"
-                steps.append(
-                    PlanStep(
-                        step_id=step_id,
-                        description=f"Execute email {instruction}",
-                        assigned_agent="mail_agent",
-                        input_data={
-                            "instruction": instruction,
-                            "subject": goal,
-                            "body": goal,
-                        },
-                    )
-                )
-                step_id += 1
-            else:
-                steps.append(
-                    PlanStep(
-                        step_id=step_id,
-                        description="Search and inspect inbox emails",
-                        assigned_agent="mail_agent",
-                        input_data={"query": goal},
-                    )
-                )
-                step_id += 1
-
-        if is_web_search:
-            steps.append(
-                PlanStep(
-                    step_id=step_id,
-                    description="Search live web and research latest online intelligence",
-                    assigned_agent="web_agent",
-                    input_data={"instruction": "web_research_and_ingest", "query": goal},
-                )
-            )
-            step_id += 1
-
-        if is_doc_parse and not is_email_search:
-            steps.append(
-                PlanStep(
-                    step_id=step_id,
-                    description="Parse document",
-                    assigned_agent="doc_agent",
-                    input_data={"instruction": "parse_document", "file_path": goal},
-                )
-            )
-            step_id += 1
-
-        if is_rag or not steps:
-            steps.append(
-                PlanStep(
-                    step_id=step_id,
-                    description="Query RAG knowledge base",
-                    assigned_agent="rag_agent",
-                    input_data={"instruction": "rag_ask", "query": goal},
-                )
-            )
-            step_id += 1
 
         return ExecutionPlan(goal=goal, steps=steps)
 
@@ -669,49 +535,34 @@ class ExecutivePlanner:
 
         steps_text = "\n\n".join(step_summaries)
 
-        if self.client and hasattr(self.client, "generate"):
-            try:
-                prompt = (
-                    f"You are the WorkOS Executive AI Operating System.\n"
-                    f"The user goal was: '{plan.goal}'\n\n"
-                    f"Step Execution History & Retrieved Findings:\n{steps_text}\n\n"
-                    f"Synthesize a clear, strictly grounded, professional executive brief based on the data above:\n"
-                    f"1. ZERO-HALLUCINATION: You MUST base 100% of your facts, tables, entity names, sender addresses, filenames, and numbers exclusively on the Step Execution History above.\n"
-                    f"2. If retrieved search results or email lists are empty (`[]`) or no matching records exist, you MUST explicitly state that no matching emails or records were found in the inbox. You are strictly FORBIDDEN from inventing fake filenames (e.g. email1.txt), placeholder accounts, or fake numbers.\n"
-                    f"3. When real emails are retrieved, cite real sender addresses, subject lines, dates, and whether they represent replies or outbound messages.\n"
-                    f"4. If multiple sources or webpages present differing perspectives, compare the arguments and summarize consensus.\n"
-                    f"5. Cite sources using [1], [2] referencing source URLs or documents.\n"
-                    f"6. Format mathematical expressions with LaTeX ($...$ or $$...$$) and code with markdown code fences."
-                )
-                response_text = self.client.generate(
-                    prompt=prompt,
-                    model=self.config.model_name,
-                )
-                if response_text:
-                    summary = response_text.strip()
-                    plan.final_output = summary
-                    return summary
-            except Exception as e:
-                logger.warning(f"Ollama synthesis failed: {e}. Using deterministic synthesis.")
+        if not self.client or not hasattr(self.client, "generate"):
+            raise RuntimeError("No active LLM client configured for ExecutivePlanner synthesis.")
 
-        # Deterministic fallback summary
-        all_ok = all(s.status == "completed" for s in plan.steps)
-        lines = [
-            f"Execution {'completed successfully' if all_ok else 'finished with issues'} for goal: {plan.goal}\n"
-        ]
-        for s in plan.steps:
-            if s.result and s.result.success:
-                lines.append(
-                    f"- Step {s.step_id} ({s.assigned_agent}): {s.description} -> {s.result.data}"
-                )
-            elif s.result:
-                lines.append(f"- Step {s.step_id} ({s.assigned_agent}) FAILED: {s.result.error}")
-            else:
-                lines.append(f"- Step {s.step_id} ({s.assigned_agent}) [{s.status}]")
-
-        summary = "\n".join(lines)
-        plan.final_output = summary
-        return summary
+        try:
+            prompt = (
+                f"You are the WorkOS Executive AI Operating System.\n"
+                f"The user goal was: '{plan.goal}'\n\n"
+                f"Step Execution History & Retrieved Findings:\n{steps_text}\n\n"
+                f"Synthesize a clear, strictly grounded, professional executive brief based on the data above:\n"
+                f"1. ZERO-HALLUCINATION: You MUST base 100% of your facts, tables, entity names, sender addresses, filenames, and numbers exclusively on the Step Execution History above.\n"
+                f"2. If retrieved search results or email lists are empty (`[]`) or no matching records exist, you MUST explicitly state that no matching emails or records were found in the inbox. You are strictly FORBIDDEN from inventing fake filenames (e.g. email1.txt), placeholder accounts, or fake numbers.\n"
+                f"3. When real emails are retrieved, cite real sender addresses, subject lines, dates, and whether they represent replies or outbound messages.\n"
+                f"4. If multiple sources or webpages present differing perspectives, compare the arguments and summarize consensus.\n"
+                f"5. Cite sources using [1], [2] referencing source URLs or documents.\n"
+                f"6. Format mathematical expressions with LaTeX ($...$ or $$...$$) and code with markdown code fences."
+            )
+            response_text = self.client.generate(
+                prompt=prompt,
+                model=self.config.model_name,
+            )
+            if response_text:
+                summary = response_text.strip()
+                plan.final_output = summary
+                return summary
+            raise RuntimeError("Ollama returned empty synthesis response.")
+        except Exception as e:
+            logger.error(f"Ollama synthesis failed: {e}")
+            raise RuntimeError(f"Ollama synthesis failed: {e}") from e
 
     # Alias for compatibility with internal callers
     synthesize_output = synthesize_response
