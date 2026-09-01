@@ -155,7 +155,7 @@ class MemoryReflector:
 
     def _reflect_with_model(self, conversation_events: list[Any], model_client: Any) -> list[MemoryItem]:
         """
-        Uses Gemini LLM to extract structured memories.
+        Uses Ollama LLM to extract structured memories.
         """
         events_json = json.dumps(
             [e if isinstance(e, (dict, str)) else str(e) for e in conversation_events]
@@ -188,11 +188,17 @@ Return ONLY valid JSON array with objects matching:
   }}
 ]
 """
-        response = model_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-        )
-        resp_text = response.text.strip()
+        if hasattr(model_client, "generate"):
+            resp_text = model_client.generate(prompt=prompt, format="json").strip()
+        elif hasattr(model_client, "models"):
+            response = model_client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+            )
+            resp_text = response.text.strip()
+        else:
+            return self._reflect_rule_based(conversation_events)
+
         # Clean potential markdown code fences
         if resp_text.startswith("```"):
             resp_text = re.sub(r"^```(?:json)?\n?", "", resp_text)

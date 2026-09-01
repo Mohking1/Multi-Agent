@@ -1,11 +1,14 @@
 """Elasticsearch Parent-Child Hybrid RAG ToolKit for WorkOS."""
 import hashlib
+import logging
 import math
 import os
 import re
 import time
 from collections import Counter
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 try:
     import numpy as np
@@ -64,7 +67,10 @@ class RAGToolKit:
         self.parent_index_name = f"{self.index_name}_parents"
         self.embedder = embedder
         self.doc_toolkit = doc_toolkit
-        self.model_client = model_client
+        if model_client is not None:
+            self.model_client = model_client
+        else:
+            self.model_client = self._init_model_client()
 
         # Internal in-memory fallback stores for local testing / disconnected environments
         self._in_memory_parents: dict[str, dict[str, Any]] = {}
@@ -74,6 +80,19 @@ class RAGToolKit:
             self.es = es_client
         else:
             self.es = self._init_elasticsearch()
+
+    def _init_model_client(self) -> Any:
+        """Initializes OllamaClient for RAG embeddings and generation."""
+        try:
+            from workos_engine.llm_client import OllamaClient
+
+            return OllamaClient(
+                base_url=self.config.ollama_base_url,
+                default_model=self.config.model_name,
+                embedding_model=self.config.embedding_model,
+            )
+        except Exception:
+            return None
 
     def _init_elasticsearch(self) -> Optional[Any]:
         """Initializes Elasticsearch client if available and reachable."""
@@ -93,25 +112,17 @@ class RAGToolKit:
         return None
 
     def _get_embedding(self, text: str) -> list[float]:
-        """Computes dense vector embedding for text.
-
-        Uses provided embedder, Gemini client, or a deterministic pseudo-semantic projection.
-        """
+        """Computes dense vector embedding for text using Ollama or deterministic projection."""
         if callable(self.embedder):
             return self.embedder(text)
 
-        if self.model_client is not None and hasattr(self.model_client, "models"):
+        if self.model_client is not None and hasattr(self.model_client, "embed"):
             try:
-                res = self.model_client.models.embed_content(
-                    model="text-embedding-004",
-                    contents=text,
-                )
-                if hasattr(res, "embedding") and hasattr(res.embedding, "values"):
-                    return list(res.embedding.values)
-                if isinstance(res, dict) and "embedding" in res:
-                    return res["embedding"]
-            except Exception:
-                pass
+                embeds = self.model_client.embed(text)
+                if embeds and len(embeds) > 0:
+                    return embeds[0]
+            except Exception as e:
+                logger.debug(f"Ollama embedding failed: {e}")
 
         # High-dimensional deterministic projection (768 dims)
         dims = 768
@@ -655,7 +666,7 @@ class RAGToolKit:
 
         joined_context = "\n\n".join(context_blocks)
 
-        if self.model_client is not None and hasattr(self.model_client, "models"):
+        if self.model_client is not None and hasattr(self.model_client, "generate"):
             try:
                 prompt = (
                     f"Answer the user query strictly grounded in the provided reference context below.\n"
@@ -664,20 +675,20 @@ class RAGToolKit:
                     f"Query: {query}\n\n"
                     f"Grounded Answer:"
                 )
-                res = self.model_client.models.generate_content(
-                    model=self.config.model_name or "gemini-3.7-flash",
-                    contents=prompt,
-                )
-                answer_text = res.text.strip()
-                return {
-                    "query": query,
-                    "answer": answer_text,
-                    "citations": citations,
-                    "sources_count": len(citations),
-                    "retrieved_chunks": hits,
-                }
-            except Exception:
-                pass
+                answer_text = self.model_client.generate(
+                    prompt=prompt,
+                    model=self.config.model_name,
+                ).strip()
+                if answer_text:
+                    return {
+                        "query": query,
+                        "answer": answer_text,
+                        "citations": citations,
+                        "sources_count": len(citations),
+                        "retrieved_chunks": hits,
+                    }
+            except Exception as e:
+                logger.debug(f"Ollama generation failed: {e}")
 
         relevant_sentences = []
         for idx, hit in enumerate(hits, 1):

@@ -138,17 +138,20 @@ class ExecutivePlanner:
             "rag_agent": self.rag_agent,
         }
 
-        self.client = client or self._init_genai_client()
+        self.client = client or self._init_ollama_client()
 
-    def _init_genai_client(self) -> Any:
-        """Initializes the Google GenAI Client if available."""
+    def _init_ollama_client(self) -> Any:
+        """Initializes the Ollama Client."""
         try:
-            from google import genai
+            from workos_engine.llm_client import OllamaClient
 
-            api_key = self.config.gemini_api_key or ""
-            return genai.Client(api_key=api_key)
+            return OllamaClient(
+                base_url=self.config.ollama_base_url,
+                default_model=self.config.model_name,
+                embedding_model=self.config.embedding_model,
+            )
         except Exception as e:
-            logger.warning(f"Could not initialize Google GenAI Client: {e}")
+            logger.warning(f"Could not initialize Ollama Client: {e}")
             return None
 
     def build_planning_context(self, goal: str) -> str:
@@ -218,23 +221,18 @@ class ExecutivePlanner:
             f"4. Output MUST strictly be valid JSON with keys: 'goal' and 'steps' (array of objects with 'step_id', 'description', 'assigned_agent', 'input_data')."
         )
 
-        if self.client and hasattr(self.client, "models"):
+        if self.client and hasattr(self.client, "generate"):
             try:
-                from google.genai import types
-
-                gen_config = types.GenerateContentConfig(
-                    temperature=0.1,
-                    response_mime_type="application/json",
-                )
-                response = self.client.models.generate_content(
+                response_text = self.client.generate(
+                    prompt=prompt,
                     model=self.config.model_name,
-                    contents=prompt,
-                    config=gen_config,
+                    format="json",
+                    temperature=0.1,
                 )
-                if response and response.text:
-                    return self._parse_plan_json(response.text, fallback_goal=goal)
+                if response_text:
+                    return self._parse_plan_json(response_text, fallback_goal=goal)
             except Exception as e:
-                logger.warning(f"LLM plan generation failed: {e}. Falling back to heuristic planner.")
+                logger.warning(f"Ollama plan generation failed: {e}. Falling back to heuristic planner.")
 
         return self._heuristic_plan_fallback(goal)
 
@@ -439,7 +437,7 @@ class ExecutivePlanner:
 
         steps_text = "\n\n".join(step_summaries)
 
-        if self.client and hasattr(self.client, "models") and self.config.gemini_api_key:
+        if self.client and hasattr(self.client, "generate"):
             try:
                 prompt = (
                     f"You are the WorkOS Executive AI Operating System.\n"
@@ -448,16 +446,16 @@ class ExecutivePlanner:
                     f"Synthesize a clear, direct, professional response grounded strictly in the data above. "
                     f"Include key metrics, extracted entities, filenames, or failure reasons if applicable."
                 )
-                response = self.client.models.generate_content(
+                response_text = self.client.generate(
+                    prompt=prompt,
                     model=self.config.model_name,
-                    contents=prompt,
                 )
-                if response and response.text:
-                    summary = response.text.strip()
+                if response_text:
+                    summary = response_text.strip()
                     plan.final_output = summary
                     return summary
             except Exception as e:
-                logger.warning(f"LLM synthesis failed: {e}. Using deterministic synthesis.")
+                logger.warning(f"Ollama synthesis failed: {e}. Using deterministic synthesis.")
 
         # Deterministic fallback summary
         all_ok = all(s.status == "completed" for s in plan.steps)

@@ -62,7 +62,8 @@ class WorkOSApp:
         status_table.add_column(style="white")
 
         autonomy_style = "bold green" if self.config.autonomy_level == AutonomyLevel.FULL else "bold yellow"
-        status_table.add_row("Model:", f"{self.config.model_name}", "Autonomy Policy:", f"[{autonomy_style}]{self.config.autonomy_level.value}[/]")
+        status_table.add_row("Ollama URL:", f"{self.config.ollama_base_url}", "Autonomy Policy:", f"[{autonomy_style}]{self.config.autonomy_level.value}[/]")
+        status_table.add_row("Model:", f"{self.config.model_name}", "Embeddings:", f"{self.config.embedding_model}")
         status_table.add_row("Memory DB:", f"{self.config.memory_db_path}", "Elasticsearch:", f"{self.config.elasticsearch_url}")
         status_table.add_row("Subagents:", "mail_agent, doc_agent, rag_agent", "Trusted Recip:", f"{len(self.config.trusted_recipients)} configured")
 
@@ -85,6 +86,8 @@ class WorkOSApp:
         table.add_column("Description", style="white")
 
         table.add_row("/help", "", "Show this commands reference table")
+        table.add_row("/models", "", "List local Ollama models")
+        table.add_row("/model", "<model_name>", "Switch active Ollama model")
         table.add_row("/policy", "[FULL | SUPERVISED]", "View or switch system autonomy policy")
         table.add_row("/plan", "<goal>", "Preview dynamic execution plan without executing")
         table.add_row("/memory", "[summary | loci]", "Display spatial Loci memory architecture summary")
@@ -275,6 +278,9 @@ class WorkOSApp:
                 self.console.clear()
                 return True
 
+            elif cmd in ("/model", "/models"):
+                return await self._handle_model_cmd(args)
+
             elif cmd in ("/policy", "/autonomy"):
                 return await self._handle_policy_cmd(args)
 
@@ -304,6 +310,42 @@ class WorkOSApp:
 
         # Natural language goal execution
         await self.execute_goal(line)
+        return True
+
+    async def _handle_model_cmd(self, args: list[str]) -> bool:
+        """Handles /models and /model <name> commands for Ollama."""
+        from workos_engine.llm_client import OllamaClient
+
+        client = getattr(self.planner, "client", None)
+        if not isinstance(client, OllamaClient):
+            client = OllamaClient(
+                base_url=self.config.ollama_base_url,
+                default_model=self.config.model_name,
+                embedding_model=self.config.embedding_model,
+            )
+
+        if not args:
+            models = client.list_models()
+            table = Table(title="Ollama Local Models", box=ROUNDED)
+            table.add_column("Model Name", style="bold cyan")
+            table.add_column("Status", style="yellow")
+
+            if models:
+                for m in models:
+                    is_active = "[bold green]ACTIVE[/bold green]" if m == self.config.model_name else "available"
+                    table.add_row(m, is_active)
+            else:
+                table.add_row("(No models returned from Ollama)", "[red]Check if Ollama is running[/red]")
+            self.console.print(table)
+            self.console.print(f"[dim]Current active model: [bold yellow]{self.config.model_name}[/bold yellow]. Use [cyan]/model <name>[/cyan] to switch.[/dim]")
+            return True
+
+        new_model = args[0]
+        self.config.model_name = new_model
+        self.planner.config.model_name = new_model
+        if hasattr(self.planner, "client") and hasattr(self.planner.client, "default_model"):
+            self.planner.client.default_model = new_model
+        self.console.print(f"[green]✓ Active model switched to: [bold]{new_model}[/bold][/green]")
         return True
 
     async def _handle_policy_cmd(self, args: list[str]) -> bool:

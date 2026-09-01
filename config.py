@@ -8,12 +8,16 @@ load_dotenv()
 
 @dataclass
 class WorkOSConfig:
-    gemini_api_key: str = field(
-        default_factory=lambda: os.getenv("GEMINI_API_KEY")
-        or os.getenv("GOOGLE_API_KEY", "")
+    ollama_base_url: str = field(
+        default_factory=lambda: os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     )
     model_name: str = field(
-        default_factory=lambda: os.getenv("MODEL_NAME", "gemini-3.7-flash")
+        default_factory=lambda: os.getenv(
+            "MODEL_NAME", "hf.co/unsloth/SmolLM3-3B-GGUF:UD-Q6_K_XL"
+        )
+    )
+    embedding_model: str = field(
+        default_factory=lambda: os.getenv("EMBEDDING_MODEL", "bge-m3:latest")
     )
     autonomy_level: AutonomyLevel = field(
         default_factory=lambda: AutonomyLevel(
