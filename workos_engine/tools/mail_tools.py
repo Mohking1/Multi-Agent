@@ -46,10 +46,30 @@ class MailToolKit:
             criteria["from_"] = sender
         if subject:
             criteria["subject"] = subject
+
+        def _parse_date(d: Any) -> date | None:
+            if isinstance(d, datetime):
+                return d.date()
+            if isinstance(d, date):
+                return d
+            if isinstance(d, str):
+                try:
+                    return datetime.fromisoformat(d.replace("Z", "+00:00")).date()
+                except Exception:
+                    try:
+                        return datetime.strptime(d[:10], "%Y-%m-%d").date()
+                    except Exception:
+                        pass
+            return None
+
         if date_gte:
-            criteria["date_gte"] = date_gte
+            parsed_gte = _parse_date(date_gte)
+            if parsed_gte:
+                criteria["date_gte"] = parsed_gte
         if date_lt:
-            criteria["date_lt"] = date_lt
+            parsed_lt = _parse_date(date_lt)
+            if parsed_lt:
+                criteria["date_lt"] = parsed_lt
         if seen is not None:
             criteria["seen"] = seen
         if search_text:

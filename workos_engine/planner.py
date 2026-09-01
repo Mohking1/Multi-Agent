@@ -17,6 +17,7 @@ from workos_engine.memory.networks import CognitiveMemoryEngine
 from workos_engine.types import (
     ExecutionPlan,
     ExecutionResult,
+    MemoryNetwork,
     PlanStep,
     SubagentTask,
 )
@@ -245,39 +246,35 @@ class ExecutivePlanner:
 
     def build_planning_context(self, goal: str) -> str:
         """
-        Gathers active beliefs, spatial Loci memory summary, and relevant recalled facts
-        to build a compact context prompt for planning.
+        Gathers active beliefs and relevant recalled domain facts/entities
+        to build a compact, clean context prompt for planning.
         """
         parts = []
 
-        # 1. Spatial index summary
-        try:
-            summary = self.memory.get_context_index_summary()
-            if summary:
-                parts.append(f"Spatial Memory Loci Index:\n{summary}")
-        except Exception as e:
-            logger.debug(f"Error getting spatial summary: {e}")
-
-        # 2. Active beliefs and preferences
+        # 1. Active beliefs and preferences
         try:
             active_beliefs = self.memory.get_active_beliefs()
             if active_beliefs:
                 belief_lines = [
-                    f"- [{b.wing}/{b.hall}] {b.key}: {b.content}" for b in active_beliefs
+                    f"- [{b.wing}/{b.hall}] {b.key}: {b.content[:150]}" for b in active_beliefs
                 ]
                 parts.append("User Beliefs & System Preferences:\n" + "\n".join(belief_lines))
         except Exception as e:
             logger.debug(f"Error getting active beliefs: {e}")
 
-        # 3. Relevant recalled facts and entities
+        # 2. Relevant recalled domain facts and entities (strictly excluding raw noisy execution logs)
         try:
             recalled = self.memory.recall(query=goal, limit=5)
-            if recalled:
-                fact_lines = [
-                    f"- [{m.network.value}:{m.wing}/{m.hall}] {m.key}: {m.content}"
-                    for m in recalled
-                ]
-                parts.append("Relevant Recalled Knowledge:\n" + "\n".join(fact_lines))
+            clean_facts = []
+            for m in recalled:
+                if m.network in (
+                    MemoryNetwork.FACTS,
+                    MemoryNetwork.ENTITIES,
+                    MemoryNetwork.BELIEFS,
+                ):
+                    clean_facts.append(f"- [{m.network.value}:{m.key}] {m.content[:200]}")
+            if clean_facts:
+                parts.append("Relevant Recalled Knowledge:\n" + "\n".join(clean_facts))
         except Exception as e:
             logger.debug(f"Error recalling facts for goal: {e}")
 
@@ -298,30 +295,38 @@ class ExecutivePlanner:
         """Internal implementation of dynamic multi-step ExecutionPlan construction."""
         ctx_text = context if context is not None else self.build_planning_context(goal)
 
-        prompt = (
-            f"You are the WorkOS Executive AI Planner. Break down the user's goal into a structured sequential multi-agent execution plan.\n\n"
-            f"User Goal: '{goal}'\n\n"
-            f"Available Specialists:\n"
-            f"- 'mail_agent': Search, read, fetch, and inspect emails in the user's inbox.\n"
-            f"- 'web_agent': Search the live internet, check online websites/forums/timelines, extract articles with citations.\n"
-            f"- 'doc_agent': Parse PDF/DOCX/image files and extract tables with TableFormer.\n"
-            f"- 'rag_agent': Search internal knowledge base and parent-child document chunks.\n\n"
-            f"Cognitive Context & Memory:\n{ctx_text}\n\n"
-            f"Planning Rules:\n"
-            f"1. If the goal requires checking inbox/emails AND searching online, you MUST create separate steps for 'mail_agent' and 'web_agent'.\n"
-            f"2. You can reference outputs of previous steps using variable interpolation like '$step_1.saved_path' or '$step_1.results'.\n"
-            f"3. Return strictly valid JSON in this exact structure:\n"
-            f'{{\n  "goal": "{goal}",\n  "steps": [\n'
-            f'    {{"step_id": 1, "assigned_agent": "<agent_name>", "description": "<concise step description>", "input_data": {{"query": "<search or mission details>"}}}}\n'
-            f"  ]\n}}"
+        system_prompt = (
+            "You are the WorkOS Executive Multi-Agent Planner.\n"
+            "You NEVER execute, answer, or fulfill the user request directly.\n"
+            'Your ONLY role is to output a JSON object containing the "goal" and a sequential "steps" array decomposing the request across specialist agents:\n\n'
+            "Specialist Agents:\n"
+            "- 'mail_agent': Searches and inspects the user's email inbox.\n"
+            "- 'web_agent': Searches the live web, online forums, news, and portals.\n"
+            "- 'doc_agent': Parses uploaded PDF/DOCX files and tables.\n"
+            "- 'rag_agent': Searches internal knowledge base chunks.\n\n"
+            "Planning Directives:\n"
+            "1. If the request asks to check emails/inbox AND search online, you MUST create TWO distinct steps:\n"
+            "   - Step 1 assigned to 'mail_agent' to search recent emails in the inbox.\n"
+            "   - Step 2 assigned to 'web_agent' to search online web sources and timelines.\n"
+            "2. Return strictly valid JSON in this exact structure:\n"
+            "{\n"
+            '  "goal": "<user request>",\n'
+            '  "steps": [\n'
+            '    {"step_id": 1, "assigned_agent": "mail_agent", "description": "Search inbox for emails regarding Dresden, FAU, or Dortmund", "input_data": {"query": "Dresden FAU Dortmund"}},\n'
+            '    {"step_id": 2, "assigned_agent": "web_agent", "description": "Search online for expected admission release dates and timelines", "input_data": {"query": "TU Dresden FAU Erlangen Dortmund admission results timeline"}}\n'
+            "  ]\n"
+            "}"
         )
+
+        user_prompt = f"User Request:\n'{goal}'\n\nCognitive Context & Memory:\n{ctx_text}\n\nFormulate the execution plan now."
 
         if not self.client or not hasattr(self.client, "generate"):
             raise RuntimeError("No active LLM client configured for ExecutivePlanner.")
 
         try:
             response_text = self.client.generate(
-                prompt=prompt,
+                prompt=user_prompt,
+                system=system_prompt,
                 model=self.config.model_name,
                 format="json",
                 temperature=0.1,
