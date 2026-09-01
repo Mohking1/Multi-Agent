@@ -256,27 +256,100 @@ class ExecutivePlanner:
         return self._generate_plan(goal, context=context)
 
     def _parse_plan_json(self, response_text: str, fallback_goal: str) -> ExecutionPlan:
-        """Parses LLM JSON response into an ExecutionPlan object."""
+        """Parses LLM JSON response into an ExecutionPlan object with multi-format resilience."""
         text = response_text.strip()
         if "```json" in text:
             text = text.split("```json", 1)[1].split("```", 1)[0].strip()
         elif "```" in text:
             text = text.split("```", 1)[1].split("```", 1)[0].strip()
         else:
-            start = text.find("{")
-            end = text.rfind("}")
-            if start != -1 and end != -1 and end > start:
-                text = text[start : end + 1]
+            start_obj = text.find("{")
+            start_arr = text.find("[")
+            if start_obj != -1 and (start_arr == -1 or start_obj < start_arr):
+                end_obj = text.rfind("}")
+                if end_obj > start_obj:
+                    text = text[start_obj : end_obj + 1]
+            elif start_arr != -1:
+                end_arr = text.rfind("]")
+                if end_arr > start_arr:
+                    text = text[start_arr : end_arr + 1]
 
         data = json.loads(text)
-        goal = data.get("goal", fallback_goal)
-        raw_steps = data.get("steps", [])
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except Exception:
+                pass
+
+        if isinstance(data, list):
+            goal = fallback_goal
+            raw_steps = data
+        elif isinstance(data, dict):
+            goal = data.get("goal", fallback_goal)
+            raw_steps = data.get("steps", [])
+        else:
+            return self._heuristic_plan_fallback(fallback_goal)
+
+        if isinstance(raw_steps, dict):
+            raw_steps = [raw_steps]
+        elif not isinstance(raw_steps, list):
+            raw_steps = []
+
+        valid_agents = (
+            list(self.agents.keys())
+            if hasattr(self, "agents")
+            else ["mail_agent", "doc_agent", "rag_agent", "web_agent"]
+        )
+
         steps = []
         for idx, s in enumerate(raw_steps, 1):
-            step_id = s.get("step_id", idx)
-            desc = s.get("description", f"Step {step_id}")
-            assigned_agent = s.get("assigned_agent", "rag_agent")
-            input_data = s.get("input_data", {})
+            if isinstance(s, str):
+                desc = s
+                step_id = idx
+                assigned_agent = (
+                    "web_agent"
+                    if any(
+                        w in desc.lower() for w in ["web", "online", "search", "google", "internet"]
+                    )
+                    else "rag_agent"
+                )
+                input_data = {"instruction": "execute", "query": desc}
+            elif isinstance(s, dict):
+                try:
+                    step_id = int(s.get("step_id", idx))
+                except (ValueError, TypeError):
+                    step_id = idx
+                desc = str(
+                    s.get("description") or s.get("desc") or s.get("name") or f"Step {step_id}"
+                )
+                assigned_agent = (
+                    str(s.get("assigned_agent") or s.get("agent") or "").strip().lower()
+                )
+
+                # Normalize agent name
+                if assigned_agent not in valid_agents:
+                    if any(w in assigned_agent for w in ["mail", "email", "inbox"]):
+                        assigned_agent = "mail_agent"
+                    elif any(w in assigned_agent for w in ["doc", "parse", "pdf", "table"]):
+                        assigned_agent = "doc_agent"
+                    elif any(
+                        w in assigned_agent
+                        for w in ["web", "search", "internet", "google", "fetch"]
+                    ):
+                        assigned_agent = "web_agent"
+                    elif any(w in assigned_agent for w in ["rag", "knowledge", "index", "vector"]):
+                        assigned_agent = "rag_agent"
+                    else:
+                        assigned_agent = "web_agent" if "web" in desc.lower() else "rag_agent"
+
+                input_data = s.get("input_data") or s.get("params") or s.get("args") or {}
+                if isinstance(input_data, str):
+                    input_data = {"instruction": "execute", "query": input_data}
+                elif not isinstance(input_data, dict):
+                    input_data = {}
+            else:
+                continue
+
             steps.append(
                 PlanStep(
                     step_id=step_id,
@@ -286,6 +359,10 @@ class ExecutivePlanner:
                     status="pending",
                 )
             )
+
+        if not steps:
+            return self._heuristic_plan_fallback(fallback_goal)
+
         return ExecutionPlan(goal=goal, steps=steps)
 
     def _heuristic_plan_fallback(self, goal: str) -> ExecutionPlan:
