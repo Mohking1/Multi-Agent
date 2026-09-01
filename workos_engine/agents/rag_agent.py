@@ -25,62 +25,83 @@ class RAGAgent(BaseSubagent):
         self,
         config: WorkOSConfig | None = None,
         toolkit: RAGToolKit | None = None,
+        model_client: Any | None = None,
     ):
-        super().__init__(config=config)
+        super().__init__(config=config, model_client=model_client)
         self.toolkit = toolkit or RAGToolKit(config=self.config)
 
+    def execute_tool(self, tool_name: str, args: dict[str, Any]) -> Any:
+        """Dispatches an individual tool call for the RAGAgent."""
+        t = tool_name.lower().strip()
+        if t in ("rag_search", "search", "hybrid_search", "find"):
+            return self.toolkit.rag_search(**args)
+        elif t in (
+            "rag_ingest_pdf",
+            "ingest_pdf",
+            "ingest",
+            "ingest_document",
+        ):
+            return self.toolkit.rag_ingest_pdf(**args)
+        elif t in ("rag_ask", "ask", "ask_question", "qa"):
+            return self.toolkit.rag_ask(**args)
+        elif t in ("rag_route_query", "route_query", "route", "classify"):
+            return self.toolkit.rag_route_query(**args)
+        else:
+            raise ValueError(f"Unknown RAG tool: {tool_name}")
+
     def execute(self, task: SubagentTask) -> ExecutionResult:
-        """Executes a delegated RAG instruction (search, ingest, ask, route)."""
+        """Executes a delegated RAG instruction or runs autonomous micro-ReAct loop."""
         instruction = (task.instruction or "").lower().strip()
         ctx = dict(task.context or {})
 
-        try:
-            artifacts: list[str] = []
-            if instruction == "rag_search":
-                data = self.toolkit.rag_search(**ctx)
-            elif instruction in ("search", "hybrid_search", "find"):
-                data = self.toolkit.search(**ctx)
-            elif instruction in (
-                "rag_ingest_pdf",
-                "ingest_pdf",
-                "ingest",
-                "ingest_document",
-            ):
-                data = self.toolkit.rag_ingest_pdf(**ctx)
-                if isinstance(data, dict) and "file_path" in data:
-                    fp = data["file_path"]
-                    if fp and os.path.exists(fp):
-                        artifacts.append(fp)
-            elif instruction == "rag_ask":
-                data = self.toolkit.rag_ask(**ctx)
-            elif instruction in ("ask", "ask_question", "qa"):
-                data = self.toolkit.ask(**ctx)
-            elif instruction == "rag_route_query":
-                data = self.toolkit.rag_route_query(**ctx)
-            elif instruction in ("route_query", "route", "classify"):
-                data = self.toolkit.route_query(**ctx)
-            else:
+        mapped_tools = {
+            "rag_search": "rag_search",
+            "search": "rag_search",
+            "hybrid_search": "rag_search",
+            "find": "rag_search",
+            "rag_ingest_pdf": "rag_ingest_pdf",
+            "ingest_pdf": "rag_ingest_pdf",
+            "ingest": "rag_ingest_pdf",
+            "ingest_document": "rag_ingest_pdf",
+            "rag_ask": "rag_ask",
+            "ask": "rag_ask",
+            "ask_question": "rag_ask",
+            "qa": "rag_ask",
+            "rag_route_query": "rag_route_query",
+            "route_query": "rag_route_query",
+            "route": "rag_route_query",
+            "classify": "rag_route_query",
+        }
+
+        if instruction in mapped_tools:
+            tool_name = mapped_tools[instruction]
+            try:
+                artifacts: list[str] = []
+                data = self.execute_tool(tool_name, ctx)
+                if (
+                    isinstance(data, dict)
+                    and "file_path" in data
+                    and data["file_path"]
+                    and os.path.exists(data["file_path"])
+                ):
+                    artifacts.append(data["file_path"])
+                return ExecutionResult(
+                    task_id=task.task_id,
+                    agent_name=self.name,
+                    success=True,
+                    data=data,
+                    artifacts=artifacts,
+                )
+            except Exception as e:
                 return ExecutionResult(
                     task_id=task.task_id,
                     agent_name=self.name,
                     success=False,
-                    error=f"Unknown instruction: {task.instruction}",
+                    error=str(e),
                 )
 
-            return ExecutionResult(
-                task_id=task.task_id,
-                agent_name=self.name,
-                success=True,
-                data=data,
-                artifacts=artifacts,
-            )
-        except Exception as e:
-            return ExecutionResult(
-                task_id=task.task_id,
-                agent_name=self.name,
-                success=False,
-                error=str(e),
-            )
+        # Higher-level RAG mission -> run micro-ReAct loop
+        return super().execute(task)
 
     def ingest_document(
         self,

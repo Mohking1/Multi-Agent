@@ -25,60 +25,84 @@ class DocAgent(BaseSubagent):
         self,
         config: WorkOSConfig | None = None,
         toolkit: DocToolKit | None = None,
+        model_client: Any | None = None,
     ):
-        super().__init__(config=config)
+        super().__init__(config=config, model_client=model_client)
         self.toolkit = toolkit or DocToolKit(config=self.config)
 
+    def execute_tool(self, tool_name: str, args: dict[str, Any]) -> Any:
+        """Dispatches an individual tool call for the DocAgent."""
+        t = tool_name.lower().strip()
+        if t in ("parse_document", "parse", "convert"):
+            return self.toolkit.parse_document(**args)
+        elif t in ("extract_tables", "tables", "table_former"):
+            return self.toolkit.extract_tables(**args)
+        elif t in ("extract_figures", "figures", "images"):
+            return self.toolkit.extract_figures(**args)
+        elif t in ("structure_aware_chunk", "chunk", "chunk_document"):
+            return self.toolkit.structure_aware_chunk(**args)
+        elif t in ("get_stored_document", "get_document", "fetch_document"):
+            return self.toolkit.get_stored_document(**args)
+        elif t in ("list_stored_documents", "list_documents"):
+            return self.toolkit.list_stored_documents()
+        else:
+            raise ValueError(f"Unknown doc tool: {tool_name}")
+
     def execute(self, task: SubagentTask) -> ExecutionResult:
-        """Executes a delegated document parsing, table extraction, figure extraction, or chunking instruction."""
+        """Executes a delegated document instruction or runs autonomous micro-ReAct loop."""
         instruction = (task.instruction or "").lower().strip()
         ctx = dict(task.context or {})
 
-        try:
-            artifacts: list[str] = []
-            if instruction in ("parse_document", "parse", "convert"):
-                data = self.toolkit.parse_document(**ctx)
-            elif instruction in ("extract_tables", "tables", "table_former"):
-                data = self.toolkit.extract_tables(**ctx)
-            elif instruction in ("extract_figures", "figures", "images"):
-                data = self.toolkit.extract_figures(**ctx)
+        mapped_tools = {
+            "parse_document": "parse_document",
+            "parse": "parse_document",
+            "convert": "parse_document",
+            "extract_tables": "extract_tables",
+            "tables": "extract_tables",
+            "table_former": "extract_tables",
+            "extract_figures": "extract_figures",
+            "figures": "extract_figures",
+            "images": "extract_figures",
+            "structure_aware_chunk": "structure_aware_chunk",
+            "chunk": "structure_aware_chunk",
+            "chunk_document": "structure_aware_chunk",
+            "get_stored_document": "get_stored_document",
+            "get_document": "get_stored_document",
+            "fetch_document": "get_stored_document",
+            "list_stored_documents": "list_stored_documents",
+            "list_documents": "list_stored_documents",
+        }
+
+        if instruction in mapped_tools:
+            tool_name = mapped_tools[instruction]
+            try:
+                artifacts: list[str] = []
+                data = self.execute_tool(tool_name, ctx)
                 if isinstance(data, list):
-                    for fig in data:
-                        img_path = fig.get("image_path")
-                        if img_path and os.path.exists(img_path):
-                            artifacts.append(img_path)
-            elif instruction in ("structure_aware_chunk", "chunk", "chunk_document"):
-                data = self.toolkit.structure_aware_chunk(**ctx)
-            elif instruction in (
-                "get_stored_document",
-                "get_document",
-                "fetch_document",
-            ):
-                data = self.toolkit.get_stored_document(**ctx)
-            elif instruction in ("list_stored_documents", "list_documents"):
-                data = self.toolkit.list_stored_documents()
-            else:
+                    for item in data:
+                        if (
+                            isinstance(item, dict)
+                            and "image_path" in item
+                            and os.path.exists(item["image_path"])
+                        ):
+                            artifacts.append(item["image_path"])
+                return ExecutionResult(
+                    task_id=task.task_id,
+                    agent_name=self.name,
+                    success=True,
+                    data=data,
+                    artifacts=artifacts,
+                )
+            except Exception as e:
                 return ExecutionResult(
                     task_id=task.task_id,
                     agent_name=self.name,
                     success=False,
-                    error=f"Unknown instruction: {task.instruction}",
+                    error=str(e),
                 )
 
-            return ExecutionResult(
-                task_id=task.task_id,
-                agent_name=self.name,
-                success=True,
-                data=data,
-                artifacts=artifacts,
-            )
-        except Exception as e:
-            return ExecutionResult(
-                task_id=task.task_id,
-                agent_name=self.name,
-                success=False,
-                error=str(e),
-            )
+        # Higher-level doc mission -> run micro-ReAct loop
+        return super().execute(task)
 
     def get_tool_definitions(self) -> list[dict[str, Any]]:
         """Returns JSON schema definitions of all tools provided by DocAgent for LLM planning."""

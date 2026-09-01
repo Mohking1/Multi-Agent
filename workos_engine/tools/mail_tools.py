@@ -39,25 +39,8 @@ class MailToolKit:
         text: str | None = None,
         query: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Search emails in the specified IMAP folder matching filter criteria with smart keyword filtering."""
-        search_term = (text or query or "").strip()
-
-        # Clean natural language filler from search term
-        cleaned_keyword = ""
-        if search_term:
-            import re
-
-            filler_patterns = [
-                r"\b(can you|please|search through|search in|search for|look for|find in|find|check)\b",
-                r"\b(my inbox|the inbox|inbox|emails|email|messages|mail|which|have|has|all)\b",
-                r"\b(replied|yet to reply|status|know|get|tell me|show me)\b",
-            ]
-            cleaned = search_term.lower()
-            for pat in filler_patterns:
-                cleaned = re.sub(pat, " ", cleaned, flags=re.IGNORECASE)
-            keywords = [k.strip() for k in cleaned.split() if len(k.strip()) > 2]
-            cleaned_keyword = " ".join(keywords[:3]) if keywords else ""
-
+        """Search emails in the specified IMAP folder matching filter criteria."""
+        search_text = (text or query or "").strip()
         criteria: dict[str, Any] = {}
         if sender:
             criteria["from_"] = sender
@@ -69,45 +52,16 @@ class MailToolKit:
             criteria["date_lt"] = date_lt
         if seen is not None:
             criteria["seen"] = seen
-        if cleaned_keyword:
-            criteria["text"] = cleaned_keyword
+        if search_text:
+            criteria["text"] = search_text
 
         results: list[dict[str, Any]] = []
         try:
             with self._get_mailbox(folder=folder) as mailbox:
-                # 1. Attempt targeted IMAP query
                 imap_query = AND(**criteria) if criteria else AND(all=True)
                 messages = list(
                     mailbox.fetch(imap_query, limit=limit, reverse=True, mark_seen=False)
                 )
-
-                # 2. Fallback: If targeted query returned 0 results and we had a keyword, fetch latest and filter locally
-                if not messages and (cleaned_keyword or search_term):
-                    all_recent = list(
-                        mailbox.fetch(
-                            AND(all=True), limit=max(limit, 30), reverse=True, mark_seen=False
-                        )
-                    )
-                    filter_words = [
-                        w.lower()
-                        for w in (keywords if cleaned_keyword else search_term.lower().split())
-                        if len(w) > 2
-                    ]
-
-                    if filter_words:
-                        filtered = []
-                        for msg in all_recent:
-                            subj = (getattr(msg, "subject", "") or "").lower()
-                            from_addr = (getattr(msg, "from_", "") or "").lower()
-                            body_text = (
-                                getattr(msg, "text", "") or getattr(msg, "html", "") or ""
-                            ).lower()
-                            combined = f"{subj} {from_addr} {body_text}"
-                            if any(w in combined for w in filter_words):
-                                filtered.append(msg)
-                        messages = filtered if filtered else all_recent[:limit]
-                    else:
-                        messages = all_recent[:limit]
 
                 for msg in messages:
                     flags = list(getattr(msg, "flags", ()) or ())

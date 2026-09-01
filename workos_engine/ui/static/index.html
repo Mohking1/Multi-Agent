@@ -372,8 +372,6 @@
                   </div>
 
                   <!-- Extracted Snippet Quote -->
-                  <div class="p-3 rounded bg-obsidian-card border-l-2 border-brand-cyan text-xs text-gray-200 leading-relaxed italic">
-                    <span x-text="selectedCitation.snippet"></span>
                   <div class="p-3 rounded bg-obsidian-card border-l-2 border-brand-cyan text-xs text-gray-200 leading-relaxed">
                     <div class="prose-dark text-xs" x-html="renderMarkdown(selectedCitation.snippet)"></div>
                   </div>
@@ -846,17 +844,10 @@
           }
         },
 
-        renderMarkdown(md) {
         renderMathAndMarkdown(md) {
           if (!md) return '';
-          return marked.parse(md);
-        },
           let text = String(md);
 
-        renderEnhancedMarkdown(md) {
-          if (!md) return '';
-          let html = marked.parse(md);
-          // Replace [1], [2], etc. with interactive clickable citation badges
           // Strip <think>...</think> chain-of-thought blocks if emitted by reasoning models
           text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 

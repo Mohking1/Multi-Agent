@@ -22,8 +22,9 @@ class MailAgent(BaseSubagent):
         self,
         config: WorkOSConfig | None = None,
         toolkit: MailToolKit | None = None,
+        model_client: Any | None = None,
     ):
-        super().__init__(config=config)
+        super().__init__(config=config, model_client=model_client)
         self.toolkit = toolkit or MailToolKit(config=self.config)
 
     def execute_send(
@@ -37,6 +38,7 @@ class MailAgent(BaseSubagent):
         attachments: list[str] | None = None,
     ) -> dict[str, Any]:
         """Sends an email or stages it as a draft depending on autonomy policy and recipient whitelist."""
+
         recipients = [to_email] if isinstance(to_email, str) else list(to_email)
         trusted = [t.lower().strip() for t in self.config.trusted_recipients]
 
@@ -74,54 +76,84 @@ class MailAgent(BaseSubagent):
         send_res["requires_confirmation"] = False
         return send_res
 
+    def execute_tool(self, tool_name: str, args: dict[str, Any]) -> Any:
+        """Dispatches an individual tool call for the MailAgent."""
+        t = tool_name.lower().strip()
+        if t in ("search_emails", "search"):
+            return self.toolkit.search_emails(**args)
+        elif t in ("fetch_email", "fetch", "read"):
+            return self.toolkit.fetch_email(**args)
+        elif t in ("download_attachment", "download"):
+            path = self.toolkit.download_attachment(**args)
+            return {"saved_path": path}
+        elif t in ("create_draft", "draft"):
+            return self.toolkit.create_draft(**args)
+        elif t in ("send_email", "send", "execute_send"):
+            return self.execute_send(**args)
+        elif t in ("move_email", "move"):
+            return self.toolkit.move_email(**args)
+        elif t in ("mark_email", "mark"):
+            return self.toolkit.mark_email(**args)
+        elif t in ("organize_emails", "organize", "organize_folder"):
+            return self.toolkit.organize_emails(**args)
+        else:
+            raise ValueError(f"Unknown mail tool: {tool_name}")
+
     def execute(self, task: SubagentTask) -> ExecutionResult:
-        """Executes a delegated email task instruction."""
+        """Executes a delegated email task instruction or runs autonomous micro-ReAct loop."""
         instruction = (task.instruction or "").lower().strip()
         ctx = dict(task.context or {})
 
-        try:
-            artifacts: list[str] = []
-            if instruction in ("search_emails", "search"):
-                data = self.toolkit.search_emails(**ctx)
-            elif instruction in ("fetch_email", "fetch", "read"):
-                data = self.toolkit.fetch_email(**ctx)
-            elif instruction in ("download_attachment", "download"):
-                file_path = self.toolkit.download_attachment(**ctx)
-                data = {"saved_path": file_path}
-                if os.path.exists(file_path):
-                    artifacts.append(file_path)
-            elif instruction in ("create_draft", "draft"):
-                data = self.toolkit.create_draft(**ctx)
-            elif instruction in ("send_email", "send", "execute_send"):
-                data = self.execute_send(**ctx)
-            elif instruction in ("move_email", "move"):
-                data = self.toolkit.move_email(**ctx)
-            elif instruction in ("mark_email", "mark"):
-                data = self.toolkit.mark_email(**ctx)
-            elif instruction in ("organize_emails", "organize", "organize_folder"):
-                data = self.toolkit.organize_emails(**ctx)
-            else:
+        # Direct mapped tool calls
+        mapped_tools = {
+            "search_emails": "search_emails",
+            "search": "search_emails",
+            "fetch_email": "fetch_email",
+            "fetch": "fetch_email",
+            "read": "fetch_email",
+            "download_attachment": "download_attachment",
+            "download": "download_attachment",
+            "create_draft": "create_draft",
+            "draft": "create_draft",
+            "send_email": "send_email",
+            "send": "send_email",
+            "execute_send": "send_email",
+            "move_email": "move_email",
+            "move": "move_email",
+            "mark_email": "mark_email",
+            "mark": "mark_email",
+            "organize_emails": "organize_emails",
+            "organize": "organize_emails",
+        }
+
+        if instruction in mapped_tools:
+            tool_name = mapped_tools[instruction]
+            try:
+                artifacts: list[str] = []
+                data = self.execute_tool(tool_name, ctx)
+                if (
+                    isinstance(data, dict)
+                    and "saved_path" in data
+                    and os.path.exists(data["saved_path"])
+                ):
+                    artifacts.append(data["saved_path"])
+                return ExecutionResult(
+                    task_id=task.task_id,
+                    agent_name=self.name,
+                    success=True,
+                    data=data,
+                    artifacts=artifacts,
+                )
+            except Exception as e:
                 return ExecutionResult(
                     task_id=task.task_id,
                     agent_name=self.name,
                     success=False,
-                    error=f"Unknown instruction: {task.instruction}",
+                    error=str(e),
                 )
 
-            return ExecutionResult(
-                task_id=task.task_id,
-                agent_name=self.name,
-                success=True,
-                data=data,
-                artifacts=artifacts,
-            )
-        except Exception as e:
-            return ExecutionResult(
-                task_id=task.task_id,
-                agent_name=self.name,
-                success=False,
-                error=str(e),
-            )
+        # Higher-level reasoning mission -> run micro-ReAct loop
+        return super().execute(task)
 
     def get_tool_definitions(self) -> list[dict[str, Any]]:
         """Returns JSON schema definitions of all tools provided by the MailAgent."""

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from config import WorkOSConfig, get_config
+from config import WorkOSConfig
 from workos_engine.agents.base import BaseSubagent
 from workos_engine.tools.web_tools import WebToolKit
 from workos_engine.types import ExecutionResult, SubagentTask
@@ -25,8 +25,9 @@ class WebAgent(BaseSubagent):
         config: WorkOSConfig | None = None,
         toolkit: WebToolKit | None = None,
         rag_toolkit: Any | None = None,
+        model_client: Any | None = None,
     ):
-        self.config = config or get_config()
+        super().__init__(config=config, model_client=model_client)
         self.toolkit = toolkit or WebToolKit(config=self.config, rag_toolkit=rag_toolkit)
 
     @property
@@ -39,6 +40,29 @@ class WebAgent(BaseSubagent):
             "Specialist agent for live internet search (SearXNG/DuckDuckGo), "
             "deep web article extraction via Trafilatura, and web knowledge grounding."
         )
+
+    def execute_tool(self, tool_name: str, args: dict[str, Any]) -> Any:
+        """Dispatches an individual tool call for the WebAgent."""
+        t = tool_name.lower().strip()
+        if t in ("web_search", "search_web", "search"):
+            query = args.get("query", "")
+            num_results = int(args.get("num_results", 5))
+            results = self.toolkit.search_web(query=query, num_results=num_results)
+            return {"results": results, "query": query, "count": len(results)}
+        elif t in ("web_fetch", "fetch_page", "fetch_page_content", "fetch"):
+            url = args.get("url", "")
+            return self.toolkit.fetch_page_content(url=url)
+        elif t in (
+            "web_research_and_ingest",
+            "research_and_ingest",
+            "research",
+            "web_research",
+        ):
+            query = args.get("query", "")
+            max_pages = int(args.get("max_pages", 3))
+            return self.toolkit.research_and_ingest(query=query, max_pages=max_pages)
+        else:
+            raise ValueError(f"Unknown web tool: {tool_name}")
 
     def get_tool_definitions(self) -> list[dict[str, Any]]:
         """Returns JSON schema tool definitions for the WebAgent."""
@@ -98,9 +122,7 @@ class WebAgent(BaseSubagent):
         ]
 
     def execute(self, task: SubagentTask) -> ExecutionResult:
-        """
-        Executes a web task dispatched by the ExecutivePlanner.
-        """
+        """Executes a web task or runs autonomous micro-ReAct loop."""
         instruction = (
             task.instruction.lower().strip()
             if task.instruction
@@ -108,73 +130,41 @@ class WebAgent(BaseSubagent):
         )
         context = task.context or {}
 
-        try:
-            if instruction in ("web_search", "search_web", "search"):
-                query = context.get("query", "")
-                num_results = int(context.get("num_results", 5))
-                results = self.toolkit.search_web(query=query, num_results=num_results)
-                return ExecutionResult(
-                    task_id=task.task_id,
-                    agent_name=self.name,
-                    success=True,
-                    data={"results": results, "query": query, "count": len(results)},
-                )
+        mapped_tools = {
+            "web_search": "web_search",
+            "search_web": "web_search",
+            "search": "web_search",
+            "web_fetch": "web_fetch",
+            "fetch_page": "web_fetch",
+            "fetch_page_content": "web_fetch",
+            "fetch": "web_fetch",
+            "web_research_and_ingest": "web_research_and_ingest",
+            "research_and_ingest": "web_research_and_ingest",
+            "research": "web_research_and_ingest",
+            "web_research": "web_research_and_ingest",
+        }
 
-            elif instruction in ("web_fetch", "fetch_page", "fetch_page_content", "fetch"):
-                url = context.get("url", "")
-                data = self.toolkit.fetch_page_content(url=url)
-                success = data.get("status") == "success" or bool(data.get("content"))
-                return ExecutionResult(
-                    task_id=task.task_id,
-                    agent_name=self.name,
-                    success=success,
-                    data=data,
-                )
-
-            elif instruction in (
-                "web_research_and_ingest",
-                "research_and_ingest",
-                "research",
-                "web_research",
-            ):
-                query = context.get("query", "")
-                max_pages = int(context.get("max_pages", 3))
-                data = self.toolkit.research_and_ingest(query=query, max_pages=max_pages)
+        if instruction in mapped_tools:
+            tool_name = mapped_tools[instruction]
+            try:
+                data = self.execute_tool(tool_name, context)
+                artifacts = data.get("citations", []) if isinstance(data, dict) else []
                 return ExecutionResult(
                     task_id=task.task_id,
                     agent_name=self.name,
                     success=True,
                     data=data,
-                    artifacts=data.get("citations", []),
+                    artifacts=artifacts,
+                )
+            except Exception as e:
+                return ExecutionResult(
+                    task_id=task.task_id,
+                    agent_name=self.name,
+                    success=False,
+                    error=str(e),
                 )
 
-            # Heuristic default: If query is present, do research; if url is present, fetch
-            if "url" in context:
-                data = self.toolkit.fetch_page_content(url=context["url"])
-                return ExecutionResult(
-                    task_id=task.task_id, agent_name=self.name, success=True, data=data
-                )
-            elif "query" in context:
-                data = self.toolkit.research_and_ingest(
-                    query=context["query"], max_pages=int(context.get("max_pages", 3))
-                )
-                return ExecutionResult(
-                    task_id=task.task_id, agent_name=self.name, success=True, data=data
-                )
-
-            return ExecutionResult(
-                task_id=task.task_id,
-                agent_name=self.name,
-                success=False,
-                error=f"Unrecognized web instruction: '{instruction}'",
-            )
-        except Exception as e:
-            logger.error(f"Error executing WebAgent task {task.task_id}: {e}", exc_info=True)
-            return ExecutionResult(
-                task_id=task.task_id,
-                agent_name=self.name,
-                success=False,
-                error=str(e),
-            )
+        # Higher-level web mission -> run micro-ReAct loop
+        return super().execute(task)
 
     execute_task = execute
