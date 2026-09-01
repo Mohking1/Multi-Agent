@@ -136,10 +136,13 @@
         </div>
 
         <!-- Autonomy Policy Toggle -->
-        <button @click="togglePolicy()" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-medium transition-all border"
-          :class="status.autonomy_level === 'FULL' ? 'bg-emerald-950/60 text-brand-emerald border-emerald-800/60' : 'bg-amber-950/60 text-brand-amber border-amber-800/60'">
-          <i class="fa-solid" :class="status.autonomy_level === 'FULL' ? 'fa-shield-halved' : 'fa-hand'"></i>
-          <span x-text="status.autonomy_level"></span>
+        <button 
+          @click="togglePolicy()" 
+          title="Click to toggle Autonomy: SUPERVISED (Prompt before sensitive actions) vs FULL (Autonomous)"
+          class="flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-mono font-medium transition-all border cursor-pointer select-none hover:opacity-90 active:scale-95 shadow-sm"
+          :class="status.autonomy_level === 'FULL' ? 'bg-emerald-950/80 text-brand-emerald border-emerald-600 shadow-emerald-900/30' : 'bg-amber-950/80 text-brand-amber border-amber-600 shadow-amber-900/30'">
+          <i class="fa-solid text-[11px]" :class="status.autonomy_level === 'FULL' ? 'fa-bolt text-brand-emerald' : 'fa-hand text-brand-amber'"></i>
+          <span x-text="status.autonomy_level === 'FULL' ? 'AUTONOMOUS' : 'SUPERVISED'"></span>
         </button>
       </div>
     </div>
@@ -602,16 +605,22 @@
         },
 
         async togglePolicy() {
-          const next = this.status.autonomy_level === 'FULL' ? 'SUPERVISED' : 'FULL';
+          const current = this.status.autonomy_level;
+          const next = current === 'FULL' ? 'SUPERVISED' : 'FULL';
+          this.status.autonomy_level = next; // Instant optimistic UI update
           try {
-            await fetch('/api/policy', {
+            const res = await fetch('/api/policy', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ autonomy_level: next })
             });
-            this.fetchStatus();
+            const data = await res.json();
+            if (data && data.autonomy_level) {
+              this.status.autonomy_level = data.autonomy_level;
+            }
           } catch (e) {
             console.error('Error toggling policy:', e);
+            this.status.autonomy_level = current; // Rollback on error
           }
         },
 

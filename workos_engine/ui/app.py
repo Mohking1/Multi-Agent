@@ -118,11 +118,14 @@ async def get_system_status():
 
 @app.post("/api/policy")
 async def update_policy(req: PolicyUpdateRequest):
-    level_str = req.autonomy_level.upper()
-    if level_str not in ("FULL", "SUPERVISED"):
-        raise HTTPException(status_code=400, detail="Invalid autonomy level")
+    level_str = req.autonomy_level.upper().strip()
+    if level_str in ("AUTO", "AUTONOMOUS", "FULL"):
+        new_level = AutonomyLevel.FULL
+    elif level_str in ("SUPERVISED", "MANUAL", "GUARDED"):
+        new_level = AutonomyLevel.SUPERVISED
+    else:
+        raise HTTPException(status_code=400, detail=f"Invalid autonomy level: {req.autonomy_level}")
 
-    new_level = AutonomyLevel(level_str)
     config.autonomy_level = new_level
     planner.config.autonomy_level = new_level
     planner.mail_agent.config.autonomy_level = new_level
