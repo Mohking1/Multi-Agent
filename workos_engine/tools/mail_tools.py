@@ -1,5 +1,6 @@
 """IMAP, SMTP, and Email Organization ToolKit for WorkOS."""
 
+import logging
 import os
 import smtplib
 from datetime import date, datetime
@@ -9,6 +10,8 @@ from typing import Any
 from imap_tools import AND, MailBox
 
 from config import WorkOSConfig, get_config
+
+logger = logging.getLogger(__name__)
 
 
 class MailToolKit:
@@ -32,10 +35,29 @@ class MailToolKit:
         date_lt: Any | None = None,
         seen: bool | None = None,
         folder: str = "INBOX",
-        limit: int = 20,
+        limit: int = 25,
         text: str | None = None,
+        query: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Search emails in the specified IMAP folder matching filter criteria."""
+        """Search emails in the specified IMAP folder matching filter criteria with smart keyword filtering."""
+        search_term = (text or query or "").strip()
+
+        # Clean natural language filler from search term
+        cleaned_keyword = ""
+        if search_term:
+            import re
+
+            filler_patterns = [
+                r"\b(can you|please|search through|search in|search for|look for|find in|find|check)\b",
+                r"\b(my inbox|the inbox|inbox|emails|email|messages|mail|which|have|has|all)\b",
+                r"\b(replied|yet to reply|status|know|get|tell me|show me)\b",
+            ]
+            cleaned = search_term.lower()
+            for pat in filler_patterns:
+                cleaned = re.sub(pat, " ", cleaned, flags=re.IGNORECASE)
+            keywords = [k.strip() for k in cleaned.split() if len(k.strip()) > 2]
+            cleaned_keyword = " ".join(keywords[:3]) if keywords else ""
+
         criteria: dict[str, Any] = {}
         if sender:
             criteria["from_"] = sender
@@ -47,47 +69,82 @@ class MailToolKit:
             criteria["date_lt"] = date_lt
         if seen is not None:
             criteria["seen"] = seen
-        if text:
-            criteria["text"] = text
-
-        query = AND(**criteria) if criteria else AND(all=True)
+        if cleaned_keyword:
+            criteria["text"] = cleaned_keyword
 
         results: list[dict[str, Any]] = []
-        with self._get_mailbox(folder=folder) as mailbox:
-            messages = mailbox.fetch(query, limit=limit, reverse=True, mark_seen=False)
-            for msg in messages:
-                flags = list(getattr(msg, "flags", ()) or ())
-                is_seen = "\\Seen" in flags or "SEEN" in flags
-                attachments = getattr(msg, "attachments", []) or []
-                body_snippet = (getattr(msg, "text", "") or getattr(msg, "html", "") or "").strip()[
-                    :200
-                ]
-
-                msg_date = getattr(msg, "date", None)
-                date_str = (
-                    msg_date.isoformat()
-                    if isinstance(msg_date, (datetime, date))
-                    else str(msg_date)
-                    if msg_date
-                    else None
+        try:
+            with self._get_mailbox(folder=folder) as mailbox:
+                # 1. Attempt targeted IMAP query
+                imap_query = AND(**criteria) if criteria else AND(all=True)
+                messages = list(
+                    mailbox.fetch(imap_query, limit=limit, reverse=True, mark_seen=False)
                 )
 
-                results.append(
-                    {
-                        "uid": getattr(msg, "uid", ""),
-                        "subject": getattr(msg, "subject", "") or "",
-                        "from": getattr(msg, "from_", "") or "",
-                        "to": list(getattr(msg, "to", ()) or ()),
-                        "cc": list(getattr(msg, "cc", ()) or ()),
-                        "bcc": list(getattr(msg, "bcc", ()) or ()),
-                        "date": date_str,
-                        "flags": flags,
-                        "seen": is_seen,
-                        "size": getattr(msg, "size", 0),
-                        "has_attachments": len(attachments) > 0,
-                        "snippet": body_snippet,
-                    }
-                )
+                # 2. Fallback: If targeted query returned 0 results and we had a keyword, fetch latest and filter locally
+                if not messages and (cleaned_keyword or search_term):
+                    all_recent = list(
+                        mailbox.fetch(
+                            AND(all=True), limit=max(limit, 30), reverse=True, mark_seen=False
+                        )
+                    )
+                    filter_words = [
+                        w.lower()
+                        for w in (keywords if cleaned_keyword else search_term.lower().split())
+                        if len(w) > 2
+                    ]
+
+                    if filter_words:
+                        filtered = []
+                        for msg in all_recent:
+                            subj = (getattr(msg, "subject", "") or "").lower()
+                            from_addr = (getattr(msg, "from_", "") or "").lower()
+                            body_text = (
+                                getattr(msg, "text", "") or getattr(msg, "html", "") or ""
+                            ).lower()
+                            combined = f"{subj} {from_addr} {body_text}"
+                            if any(w in combined for w in filter_words):
+                                filtered.append(msg)
+                        messages = filtered if filtered else all_recent[:limit]
+                    else:
+                        messages = all_recent[:limit]
+
+                for msg in messages:
+                    flags = list(getattr(msg, "flags", ()) or ())
+                    is_seen = "\\Seen" in flags or "SEEN" in flags
+                    attachments = getattr(msg, "attachments", []) or []
+                    body_snippet = (
+                        getattr(msg, "text", "") or getattr(msg, "html", "") or ""
+                    ).strip()[:300]
+
+                    msg_date = getattr(msg, "date", None)
+                    date_str = (
+                        msg_date.isoformat()
+                        if isinstance(msg_date, (datetime, date))
+                        else str(msg_date)
+                        if msg_date
+                        else None
+                    )
+
+                    results.append(
+                        {
+                            "uid": getattr(msg, "uid", ""),
+                            "subject": getattr(msg, "subject", "") or "",
+                            "from": getattr(msg, "from_", "") or "",
+                            "to": list(getattr(msg, "to", ()) or ()),
+                            "cc": list(getattr(msg, "cc", ()) or ()),
+                            "bcc": list(getattr(msg, "bcc", ()) or ()),
+                            "date": date_str,
+                            "flags": flags,
+                            "seen": is_seen,
+                            "size": getattr(msg, "size", 0),
+                            "has_attachments": len(attachments) > 0,
+                            "snippet": body_snippet,
+                        }
+                    )
+        except Exception as e:
+            logger.warning(f"IMAP search error: {e}")
+
         return results
 
     def fetch_email(

@@ -662,11 +662,13 @@ class ExecutivePlanner:
                     f"You are the WorkOS Executive AI Operating System.\n"
                     f"The user goal was: '{plan.goal}'\n\n"
                     f"Step Execution History & Retrieved Findings:\n{steps_text}\n\n"
-                    f"Synthesize a clear, grounded, professional executive brief based on the data above:\n"
-                    f"1. Connect findings logically across steps (multi-hop reasoning).\n"
-                    f"2. If multiple sources or webpages present differing perspectives, compare the arguments, contrast trade-offs, and summarize the consensus.\n"
-                    f"3. Cite sources using [1], [2] referencing the source URLs or documents.\n"
-                    f"4. Format mathematical expressions with LaTeX ($...$ or $$...$$) and code with markdown code fences."
+                    f"Synthesize a clear, strictly grounded, professional executive brief based on the data above:\n"
+                    f"1. ZERO-HALLUCINATION: You MUST base 100% of your facts, tables, entity names, sender addresses, filenames, and numbers exclusively on the Step Execution History above.\n"
+                    f"2. If retrieved search results or email lists are empty (`[]`) or no matching records exist, you MUST explicitly state that no matching emails or records were found in the inbox. You are strictly FORBIDDEN from inventing fake filenames (e.g. email1.txt), placeholder accounts, or fake numbers.\n"
+                    f"3. When real emails are retrieved, cite real sender addresses, subject lines, dates, and whether they represent replies or outbound messages.\n"
+                    f"4. If multiple sources or webpages present differing perspectives, compare the arguments and summarize consensus.\n"
+                    f"5. Cite sources using [1], [2] referencing source URLs or documents.\n"
+                    f"6. Format mathematical expressions with LaTeX ($...$ or $$...$$) and code with markdown code fences."
                 )
                 response_text = self.client.generate(
                     prompt=prompt,
