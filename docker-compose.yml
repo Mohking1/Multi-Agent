@@ -14,6 +14,16 @@ services:
       - esdata:/usr/share/elasticsearch/data
     restart: unless-stopped
 
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: workos-searxng
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - SEARXNG_SECRET=workos_searxng_secret_key_12345
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
 volumes:
   esdata:
     driver: local

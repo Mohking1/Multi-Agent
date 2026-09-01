@@ -62,6 +62,11 @@ class WorkOSConfig:
         default_factory=lambda: os.getenv("RAG_INDEX_NAME", "workos_knowledge_base")
     )
 
+    # Web Intelligence & Search (Zero-Cloud SearXNG / Fallback)
+    searxng_url: str = field(
+        default_factory=lambda: os.getenv("SEARXNG_URL", "http://localhost:8080")
+    )
+
     # Email (IMAP / SMTP)
     imap_user: str = field(
         default_factory=lambda: os.getenv("IMAP_USER") or os.getenv("GMAIL_USERNAME", "")

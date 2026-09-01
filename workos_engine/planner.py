@@ -11,6 +11,7 @@ from workos_engine.agents.base import BaseSubagent
 from workos_engine.agents.doc_agent import DocAgent
 from workos_engine.agents.mail_agent import MailAgent
 from workos_engine.agents.rag_agent import RAGAgent
+from workos_engine.agents.web_agent import WebAgent
 from workos_engine.memory.networks import CognitiveMemoryEngine
 from workos_engine.types import (
     ExecutionPlan,
@@ -122,6 +123,7 @@ class ExecutivePlanner:
         mail_agent: MailAgent | None = None,
         doc_agent: DocAgent | None = None,
         rag_agent: RAGAgent | None = None,
+        web_agent: WebAgent | None = None,
         client: Any | None = None,
     ):
         self.config = config or get_config()
@@ -129,11 +131,16 @@ class ExecutivePlanner:
         self.mail_agent = mail_agent or MailAgent(config=self.config)
         self.doc_agent = doc_agent or DocAgent(config=self.config)
         self.rag_agent = rag_agent or RAGAgent(config=self.config)
+        self.web_agent = web_agent or WebAgent(
+            config=self.config,
+            rag_toolkit=getattr(self.rag_agent, "toolkit", None),
+        )
 
         self.agents: dict[str, BaseSubagent] = {
             "mail_agent": self.mail_agent,
             "doc_agent": self.doc_agent,
             "rag_agent": self.rag_agent,
+            "web_agent": self.web_agent,
         }
 
         self.client = client or self._init_ollama_client()
@@ -218,10 +225,11 @@ class ExecutivePlanner:
             f"Available Subagent Tools Registry:\n{tools_json}\n\n"
             f"Cognitive Context & Memory:\n{ctx_text}\n\n"
             f"Rules:\n"
-            f"1. Choose assigned_agent from: ['mail_agent', 'doc_agent', 'rag_agent'].\n"
+            f"1. Choose assigned_agent from: ['mail_agent', 'doc_agent', 'rag_agent', 'web_agent'].\n"
             f"2. In input_data, specify the 'instruction' (matching one of the agent's tool names or capabilities) and all required tool parameters.\n"
             f"3. You can reference outputs of previous steps using variable interpolation like '$step_1.saved_path' or '$step_1.doc_id'.\n"
-            f"4. Output MUST strictly be valid JSON with keys: 'goal' and 'steps' (array of objects with 'step_id', 'description', 'assigned_agent', 'input_data')."
+            f"4. For live internet searches, external research, or online facts, assign to 'web_agent' with instruction 'web_search' or 'web_research_and_ingest'.\n"
+            f"5. Output MUST strictly be valid JSON with keys: 'goal' and 'steps' (array of objects with 'step_id', 'description', 'assigned_agent', 'input_data')."
         )
 
         if self.client and hasattr(self.client, "generate"):
@@ -362,6 +370,30 @@ class ExecutivePlanner:
                     description="Parse document",
                     assigned_agent="doc_agent",
                     input_data={"instruction": "parse_document", "file_path": goal},
+                )
+            )
+        elif any(
+            w in goal_lower
+            for w in [
+                "search online",
+                "search web",
+                "web",
+                "internet",
+                "google",
+                "lookup online",
+                "latest",
+                "news",
+                "website",
+                "http",
+                "url",
+            ]
+        ):
+            steps.append(
+                PlanStep(
+                    step_id=step_id,
+                    description="Search live web and research topic",
+                    assigned_agent="web_agent",
+                    input_data={"instruction": "web_research_and_ingest", "query": goal},
                 )
             )
         else:

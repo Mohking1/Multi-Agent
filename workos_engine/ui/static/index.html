@@ -255,7 +255,8 @@
                           :class="{
                             'bg-amber-950/60 text-amber-300 border-amber-800/60': step.assigned_agent === 'mail_agent',
                             'bg-cyan-950/60 text-cyan-300 border-cyan-800/60': step.assigned_agent === 'doc_agent',
-                            'bg-purple-950/60 text-purple-300 border-purple-800/60': step.assigned_agent === 'rag_agent'
+                            'bg-purple-950/60 text-purple-300 border-purple-800/60': step.assigned_agent === 'rag_agent',
+                            'bg-blue-950/60 text-blue-300 border-blue-800/60': step.assigned_agent === 'web_agent'
                           }" x-text="step.assigned_agent"></span>
 
                         <!-- Status Icon -->
@@ -329,11 +330,16 @@
                 <div class="p-3.5 rounded-lg bg-obsidian-base border border-obsidian-border space-y-2">
                   <div class="flex items-center justify-between text-xs font-mono">
                     <span class="text-brand-cyan font-bold" x-text="selectedCitation.citation_id"></span>
-                    <span class="text-gray-300 font-semibold truncate max-w-[200px]" x-text="selectedCitation.filename"></span>
+                    <span class="text-gray-300 font-semibold truncate max-w-[200px]" x-text="selectedCitation.title || selectedCitation.filename || 'Source Link'"></span>
                   </div>
                   
                   <div class="text-xs text-gray-400 font-mono text-[11px] space-y-1">
-                    <div><span class="text-gray-500">Doc ID:</span> <span class="text-gray-300" x-text="selectedCitation.doc_id"></span></div>
+                    <template x-if="selectedCitation.doc_id">
+                      <div><span class="text-gray-500">Doc ID:</span> <span class="text-gray-300" x-text="selectedCitation.doc_id"></span></div>
+                    </template>
+                    <template x-if="selectedCitation.url">
+                      <div><span class="text-gray-500">URL:</span> <span class="text-brand-cyan truncate block" x-text="selectedCitation.url"></span></div>
+                    </template>
                     <div><span class="text-gray-500">Score:</span> <span class="text-brand-emerald" x-text="selectedCitation.score || '1.0'"></span></div>
                   </div>
 
@@ -343,11 +349,19 @@
                   </div>
                 </div>
 
-                <!-- 1-Click Open Original File -->
-                <a :href="`/api/vault/${selectedCitation.doc_id}/file`" target="_blank" class="w-full py-2 px-3 rounded-lg bg-brand-cyan/10 hover:bg-brand-cyan/20 border border-brand-cyan/40 text-brand-cyan text-xs font-semibold text-center flex items-center justify-center space-x-2 transition">
-                  <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
-                  <span>Open Lossless Source in Vault</span>
-                </a>
+                <!-- 1-Click Open File or Web Link -->
+                <template x-if="selectedCitation.url">
+                  <a :href="selectedCitation.url" target="_blank" class="w-full py-2 px-3 rounded-lg bg-brand-cyan/10 hover:bg-brand-cyan/20 border border-brand-cyan/40 text-brand-cyan text-xs font-semibold text-center flex items-center justify-center space-x-2 transition">
+                    <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                    <span>Open Live Web Page in New Tab</span>
+                  </a>
+                </template>
+                <template x-if="selectedCitation.doc_id && !selectedCitation.url">
+                  <a :href="`/api/vault/${selectedCitation.doc_id}/file`" target="_blank" class="w-full py-2 px-3 rounded-lg bg-brand-cyan/10 hover:bg-brand-cyan/20 border border-brand-cyan/40 text-brand-cyan text-xs font-semibold text-center flex items-center justify-center space-x-2 transition">
+                    <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                    <span>Open Lossless Source in Vault</span>
+                  </a>
+                </template>
               </div>
             </template>
 

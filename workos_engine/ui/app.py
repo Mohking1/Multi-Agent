@@ -177,11 +177,17 @@ async def execute_goal_endpoint(req: GoalRequest):
 
     plan = await planner.run_goal(req.goal)
 
-    # Collect any citations produced during RAG steps
+    # Collect any citations produced during RAG and Web research steps
     citations = []
     for step in plan.steps:
-        if step.result and isinstance(step.result.data, dict) and "citations" in step.result.data:
-            citations.extend(step.result.data["citations"])
+        if step.result and isinstance(step.result.data, dict):
+            if "citations" in step.result.data and isinstance(step.result.data["citations"], list):
+                citations.extend(step.result.data["citations"])
+        if step.result and isinstance(step.result.artifacts, list):
+            for art in step.result.artifacts:
+                if isinstance(art, dict) and "citation_id" in art:
+                    if not any(c.get("citation_id") == art.get("citation_id") for c in citations):
+                        citations.append(art)
 
     return {
         "goal": plan.goal,
@@ -412,6 +418,15 @@ async def send_mail_endpoint(req: EmailSendRequest):
     except Exception as e:
         logger.error(f"Failed to send email: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/web/search")
+async def web_search_endpoint(query: str, num_results: int = 5):
+    """Zero-cloud live web search endpoint."""
+    if not query.strip():
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
+    results = planner.web_agent.toolkit.search_web(query=query, num_results=num_results)
+    return {"query": query, "results": results, "count": len(results)}
 
 
 def create_ui_app() -> FastAPI:
