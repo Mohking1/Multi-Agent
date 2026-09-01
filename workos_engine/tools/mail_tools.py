@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import smtplib
+import unicodedata
 from datetime import date, datetime
 from email.message import EmailMessage
 from typing import Any
@@ -40,13 +41,15 @@ class MailToolKit:
         text: str | None = None,
         query: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Search emails in the specified IMAP folder matching filter criteria."""
-        search_text = (text or query or "").strip()
+        def _clean_ascii(s: str) -> str:
+            return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+
+        search_text = _clean_ascii((text or query or "").strip())
         criteria: dict[str, Any] = {}
         if sender:
-            criteria["from_"] = sender
+            criteria["from_"] = _clean_ascii(sender)
         if subject:
-            criteria["subject"] = subject
+            criteria["subject"] = _clean_ascii(subject)
 
         def _parse_date(d: Any) -> date | None:
             if isinstance(d, datetime):
