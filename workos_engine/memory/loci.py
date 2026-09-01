@@ -1,7 +1,3 @@
-import re
-from typing import Optional
-
-
 class SpatialLociManager:
     """
     Manages spatial Loci memory organization (Wings & Halls).
@@ -16,9 +12,7 @@ class SpatialLociManager:
         "general": ["general"],
     }
 
-    def normalize_locus(
-        self, wing: Optional[str] = None, hall: Optional[str] = None
-    ) -> tuple[str, str]:
+    def normalize_locus(self, wing: str | None = None, hall: str | None = None) -> tuple[str, str]:
         """
         Normalizes wing and hall names into clean, lowercase tokens.
         Defaults to ('general', 'general') if unspecified.

@@ -1,8 +1,9 @@
 """Elasticsearch Parent-Child Hybrid RAG Specialist Subagent for WorkOS."""
-import os
-from typing import Any, Optional
 
-from config import WorkOSConfig, get_config
+import os
+from typing import Any
+
+from config import WorkOSConfig
 from workos_engine.agents.base import BaseSubagent
 from workos_engine.tools.rag_tools import RAGToolKit
 from workos_engine.types import ExecutionResult, SubagentTask
@@ -22,8 +23,8 @@ class RAGAgent(BaseSubagent):
 
     def __init__(
         self,
-        config: Optional[WorkOSConfig] = None,
-        toolkit: Optional[RAGToolKit] = None,
+        config: WorkOSConfig | None = None,
+        toolkit: RAGToolKit | None = None,
     ):
         super().__init__(config=config)
         self.toolkit = toolkit or RAGToolKit(config=self.config)
@@ -39,7 +40,12 @@ class RAGAgent(BaseSubagent):
                 data = self.toolkit.rag_search(**ctx)
             elif instruction in ("search", "hybrid_search", "find"):
                 data = self.toolkit.search(**ctx)
-            elif instruction in ("rag_ingest_pdf", "ingest_pdf", "ingest", "ingest_document"):
+            elif instruction in (
+                "rag_ingest_pdf",
+                "ingest_pdf",
+                "ingest",
+                "ingest_document",
+            ):
                 data = self.toolkit.rag_ingest_pdf(**ctx)
                 if isinstance(data, dict) and "file_path" in data:
                     fp = data["file_path"]
@@ -79,8 +85,8 @@ class RAGAgent(BaseSubagent):
     def ingest_document(
         self,
         file_path: str,
-        doc_id: Optional[str] = None,
-        metadata: Optional[dict[str, Any]] = None,
+        doc_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Direct helper to ingest a document."""
         return self.toolkit.rag_ingest_pdf(file_path=file_path, doc_id=doc_id, metadata=metadata)
@@ -90,10 +96,12 @@ class RAGAgent(BaseSubagent):
         query: str,
         top_k: int = 5,
         alpha: float = 0.5,
-        filter_metadata: Optional[dict[str, Any]] = None,
+        filter_metadata: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Direct helper to perform hybrid RRF search."""
-        return self.toolkit.search(query=query, top_k=top_k, alpha=alpha, filter_metadata=filter_metadata)
+        return self.toolkit.search(
+            query=query, top_k=top_k, alpha=alpha, filter_metadata=filter_metadata
+        )
 
     def ask_question(
         self,

@@ -1,21 +1,29 @@
 """Docling, TableFormer, and HybridChunker Document Parsing ToolKit for WorkOS."""
+
 import hashlib
+import json
+import logging
 import os
 import time
-from typing import Any, Optional
+from typing import Any
 
 from docling.chunking import HybridChunker
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions, TableFormerMode
 from docling.document_converter import DocumentConverter, PdfFormatOption
+
 from config import WorkOSConfig, get_config
+from workos_engine.vault import DocumentVault
+
+logger = logging.getLogger(__name__)
 
 
 class DocToolKit:
     """ToolKit providing Docling document conversion, TableFormer extraction, and HybridChunker operations."""
 
-    def __init__(self, config: Optional[WorkOSConfig] = None):
+    def __init__(self, config: WorkOSConfig | None = None, vault: DocumentVault | None = None):
         self.config = config or get_config()
+        self.vault = vault or DocumentVault()
         self._documents: dict[str, dict[str, Any]] = {}
 
     def _generate_doc_id(self, file_path: str) -> str:
@@ -25,9 +33,7 @@ class DocToolKit:
         clean_base = "".join(c if c.isalnum() else "_" for c in os.path.splitext(base)[0])
         return f"doc_{clean_base}_{path_hash}"
 
-    def _get_converter(
-        self, ocr: bool = False, table_former: bool = True
-    ) -> DocumentConverter:
+    def _get_converter(self, ocr: bool = False, table_former: bool = True) -> DocumentConverter:
         """Instantiates a Docling DocumentConverter with configured pipeline options."""
         pipeline_options = PdfPipelineOptions()
         pipeline_options.do_ocr = ocr
@@ -35,9 +41,7 @@ class DocToolKit:
         if table_former:
             pipeline_options.table_structure_options.mode = TableFormerMode.ACCURATE
 
-        format_options = {
-            InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
-        }
+        format_options = {InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
         return DocumentConverter(format_options=format_options)
 
     def parse_document(
@@ -46,7 +50,7 @@ class DocToolKit:
         output_format: str = "markdown",
         ocr: bool = False,
         table_former: bool = True,
-        doc_id: Optional[str] = None,
+        doc_id: str | None = None,
     ) -> dict[str, Any]:
         """Parses a document file (PDF, DOCX, PPTX, HTML, Markdown, Images) into structured content.
 
@@ -114,10 +118,26 @@ class DocToolKit:
         }
         self._documents[stored_id] = stored_record
 
+        # Store original document and parsed markdown into permanent Vault
+        try:
+            vault_doc = self.vault.store_document(
+                abs_path, doc_id=stored_id, metadata=stored_record["metadata"]
+            )
+            self.vault.store_parsed_markdown(
+                stored_id,
+                content if isinstance(content, str) else json.dumps(content),
+                table_count=tables_count,
+            )
+            vault_path = vault_doc.vault_path
+        except Exception as e:
+            logger.warning(f"Could not persist document '{stored_id}' to vault: {e}")
+            vault_path = abs_path
+
         # Return public response without internal docling document pointer
         return {
             "doc_id": stored_id,
             "file_path": abs_path,
+            "vault_path": vault_path,
             "file_name": file_name,
             "format": fmt,
             "content": content,
@@ -128,7 +148,7 @@ class DocToolKit:
         }
 
     def _resolve_document(
-        self, file_path: Optional[str] = None, doc_id: Optional[str] = None
+        self, file_path: str | None = None, doc_id: str | None = None
     ) -> tuple[Any, dict[str, Any]]:
         """Resolves a Docling Document object and its stored record from doc_id or file_path."""
         if doc_id:
@@ -152,8 +172,8 @@ class DocToolKit:
 
     def extract_tables(
         self,
-        file_path: Optional[str] = None,
-        doc_id: Optional[str] = None,
+        file_path: str | None = None,
+        doc_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Extracts structured tables with headers, row/column counts, markdown, HTML, and dataframes.
 
@@ -231,23 +251,25 @@ class DocToolKit:
             elif hasattr(table, "caption"):
                 caption = str(table.caption or "")
 
-            extracted.append({
-                "table_index": idx,
-                "caption": caption,
-                "markdown": table_md,
-                "html": table_html,
-                "num_rows": num_rows,
-                "num_cols": num_cols,
-                "dataframe": df_data,
-            })
+            extracted.append(
+                {
+                    "table_index": idx,
+                    "caption": caption,
+                    "markdown": table_md,
+                    "html": table_html,
+                    "num_rows": num_rows,
+                    "num_cols": num_cols,
+                    "dataframe": df_data,
+                }
+            )
 
         return extracted
 
     def extract_figures(
         self,
-        file_path: Optional[str] = None,
-        doc_id: Optional[str] = None,
-        output_dir: Optional[str] = None,
+        file_path: str | None = None,
+        doc_id: str | None = None,
+        output_dir: str | None = None,
     ) -> list[dict[str, Any]]:
         """Extracts pictures, charts, diagrams, and figures from a document.
 
@@ -302,8 +324,8 @@ class DocToolKit:
 
     def structure_aware_chunk(
         self,
-        file_path: Optional[str] = None,
-        doc_id: Optional[str] = None,
+        file_path: str | None = None,
+        doc_id: str | None = None,
         max_tokens: int = 512,
     ) -> list[dict[str, Any]]:
         """Splits document content into structure-aware chunks respecting sections, headings, and tables.
@@ -327,13 +349,15 @@ class DocToolKit:
             headings = list(getattr(meta, "headings", []) or [])
             doc_items = [str(item) for item in (getattr(meta, "doc_items", []) or [])]
 
-            result_chunks.append({
-                "chunk_index": idx,
-                "text": chunk_text,
-                "headings": headings,
-                "doc_items": doc_items,
-                "token_count": len(chunk_text.split()),
-            })
+            result_chunks.append(
+                {
+                    "chunk_index": idx,
+                    "text": chunk_text,
+                    "headings": headings,
+                    "doc_items": doc_items,
+                    "token_count": len(chunk_text.split()),
+                }
+            )
 
         return result_chunks
 

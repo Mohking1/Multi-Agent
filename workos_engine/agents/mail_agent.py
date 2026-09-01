@@ -1,8 +1,9 @@
 """Mail specialist subagent enforcing autonomy policies and dispatching email tools."""
-import os
-from typing import Any, Optional
 
-from config import WorkOSConfig, get_config
+import os
+from typing import Any
+
+from config import WorkOSConfig
 from workos_engine.agents.base import BaseSubagent
 from workos_engine.tools.mail_tools import MailToolKit
 from workos_engine.types import AutonomyLevel, ExecutionResult, SubagentTask
@@ -19,8 +20,8 @@ class MailAgent(BaseSubagent):
 
     def __init__(
         self,
-        config: Optional[WorkOSConfig] = None,
-        toolkit: Optional[MailToolKit] = None,
+        config: WorkOSConfig | None = None,
+        toolkit: MailToolKit | None = None,
     ):
         super().__init__(config=config)
         self.toolkit = toolkit or MailToolKit(config=self.config)
@@ -30,19 +31,16 @@ class MailAgent(BaseSubagent):
         to_email: str | list[str],
         subject: str,
         body: str,
-        cc: Optional[list[str]] = None,
-        bcc: Optional[list[str]] = None,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
         html: bool = False,
-        attachments: Optional[list[str]] = None,
+        attachments: list[str] | None = None,
     ) -> dict[str, Any]:
         """Sends an email or stages it as a draft depending on autonomy policy and recipient whitelist."""
         recipients = [to_email] if isinstance(to_email, str) else list(to_email)
         trusted = [t.lower().strip() for t in self.config.trusted_recipients]
 
-        all_trusted = (
-            len(recipients) > 0
-            and all(r.lower().strip() in trusted for r in recipients)
-        )
+        all_trusted = len(recipients) > 0 and all(r.lower().strip() in trusted for r in recipients)
 
         # In SUPERVISED mode, un-whitelisted recipients must be staged as draft
         if self.config.autonomy_level == AutonomyLevel.SUPERVISED and not all_trusted:

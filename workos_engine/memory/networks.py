@@ -1,10 +1,11 @@
 import uuid
-from typing import Any, Optional
-from config import get_config, WorkOSConfig
-from workos_engine.types import MemoryItem, MemoryNetwork
+from typing import Any
+
+from config import WorkOSConfig, get_config
 from workos_engine.memory.db import MemoryDB
 from workos_engine.memory.loci import SpatialLociManager
 from workos_engine.memory.reflect import MemoryReflector
+from workos_engine.types import MemoryItem, MemoryNetwork
 
 
 class CognitiveMemoryEngine:
@@ -15,8 +16,8 @@ class CognitiveMemoryEngine:
 
     def __init__(
         self,
-        db_path: Optional[str] = None,
-        config: Optional[WorkOSConfig] = None,
+        db_path: str | None = None,
+        config: WorkOSConfig | None = None,
     ):
         cfg = config or get_config()
         self.db_path = db_path or cfg.memory_db_path
@@ -31,7 +32,7 @@ class CognitiveMemoryEngine:
         key: str,
         content: str,
         confidence: float = 1.0,
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """
         Retains a verified fact in the Facts network under a spatial locus.
@@ -55,7 +56,7 @@ class CognitiveMemoryEngine:
         hall: str,
         key: str,
         content: str,
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """
         Retains an episodic experience or execution log in the Experiences network.
@@ -78,7 +79,7 @@ class CognitiveMemoryEngine:
         entity_name: str,
         entity_type: str,
         summary: str,
-        attributes: Optional[dict[str, Any]] = None,
+        attributes: dict[str, Any] | None = None,
     ) -> str:
         """
         Retains structured knowledge about a named entity.
@@ -92,7 +93,9 @@ class CognitiveMemoryEngine:
             attributes=attrs,
         )
 
-        norm_wing = "people" if entity_type.lower() in ["person", "contact", "user"] else "knowledge"
+        norm_wing = (
+            "people" if entity_type.lower() in ["person", "contact", "user"] else "knowledge"
+        )
         norm_hall = entity_type.lower().replace(" ", "_")
         key = entity_name.lower().replace(" ", "_")
 
@@ -114,7 +117,7 @@ class CognitiveMemoryEngine:
         hall: str,
         key: str,
         content: str,
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """
         Retains a belief/preference in the Beliefs network.
@@ -146,9 +149,9 @@ class CognitiveMemoryEngine:
     def recall(
         self,
         query: str,
-        network: Optional[MemoryNetwork | str] = None,
-        wing: Optional[str] = None,
-        hall: Optional[str] = None,
+        network: MemoryNetwork | str | None = None,
+        wing: str | None = None,
+        hall: str | None = None,
         limit: int = 10,
     ) -> list[MemoryItem]:
         """
@@ -165,7 +168,7 @@ class CognitiveMemoryEngine:
             limit=limit,
         )
 
-    def get_active_beliefs(self, wing: Optional[str] = None) -> list[MemoryItem]:
+    def get_active_beliefs(self, wing: str | None = None) -> list[MemoryItem]:
         """
         Retrieves all currently active, non-superseded beliefs.
         """
@@ -183,7 +186,7 @@ class CognitiveMemoryEngine:
     def reflect_and_update(
         self,
         conversation_events: list[Any],
-        model_client: Optional[Any] = None,
+        model_client: Any | None = None,
     ) -> list[str]:
         """
         Performs memory reflection over conversation history or task outputs,

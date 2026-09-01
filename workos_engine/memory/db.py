@@ -3,7 +3,8 @@ import os
 import re
 import sqlite3
 import time
-from typing import Any, Optional
+from typing import Any
+
 from workos_engine.types import MemoryItem, MemoryNetwork
 
 
@@ -120,10 +121,16 @@ class MemoryDB:
             )
 
             # 6. Performance indices
-            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_network ON memories(network);")
-            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_locus ON memories(wing, hall);")
+            self.conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_memories_network ON memories(network);"
+            )
+            self.conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_memories_locus ON memories(wing, hall);"
+            )
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_key ON memories(key);")
-            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_superseded ON memories(superseded_by);")
+            self.conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_memories_superseded ON memories(superseded_by);"
+            )
 
     def _row_to_memory_item(self, row: sqlite3.Row) -> MemoryItem:
         raw_meta = row["metadata"]
@@ -153,7 +160,9 @@ class MemoryDB:
                 """,
                 (
                     item.id,
-                    item.network.value if isinstance(item.network, MemoryNetwork) else str(item.network),
+                    item.network.value
+                    if isinstance(item.network, MemoryNetwork)
+                    else str(item.network),
                     item.wing,
                     item.hall,
                     item.key,
@@ -167,7 +176,7 @@ class MemoryDB:
             )
         return item.id
 
-    def get_memory(self, item_id: str) -> Optional[MemoryItem]:
+    def get_memory(self, item_id: str) -> MemoryItem | None:
         cursor = self.conn.execute("SELECT * FROM memories WHERE id = ?;", (item_id,))
         row = cursor.fetchone()
         if row:
@@ -177,9 +186,9 @@ class MemoryDB:
     def supersede_key(
         self,
         key: str,
-        wing: Optional[str] = None,
-        hall: Optional[str] = None,
-        new_id: Optional[str] = None,
+        wing: str | None = None,
+        hall: str | None = None,
+        new_id: str | None = None,
     ) -> int:
         """
         Marks all existing active memories with matching key (and optionally wing/hall)
@@ -201,9 +210,9 @@ class MemoryDB:
     def search_fts(
         self,
         query: str,
-        network: Optional[str | MemoryNetwork] = None,
-        wing: Optional[str] = None,
-        hall: Optional[str] = None,
+        network: str | MemoryNetwork | None = None,
+        wing: str | None = None,
+        hall: str | None = None,
         include_superseded: bool = False,
         limit: int = 10,
     ) -> list[MemoryItem]:
@@ -211,7 +220,11 @@ class MemoryDB:
         Performs full-text search with BM25 ranking across memories.
         Safely formats query terms and falls back to LIKE search if FTS5 syntax fails.
         """
-        net_val = network.value if isinstance(network, MemoryNetwork) else (str(network) if network else None)
+        net_val = (
+            network.value
+            if isinstance(network, MemoryNetwork)
+            else (str(network) if network else None)
+        )
 
         # Sanitize query words for FTS5
         words = re.findall(r"\w+", query)
@@ -282,14 +295,18 @@ class MemoryDB:
 
     def query_memories(
         self,
-        network: Optional[str | MemoryNetwork] = None,
-        wing: Optional[str] = None,
-        hall: Optional[str] = None,
-        key: Optional[str] = None,
+        network: str | MemoryNetwork | None = None,
+        wing: str | None = None,
+        hall: str | None = None,
+        key: str | None = None,
         active_only: bool = True,
         limit: int = 50,
     ) -> list[MemoryItem]:
-        net_val = network.value if isinstance(network, MemoryNetwork) else (str(network) if network else None)
+        net_val = (
+            network.value
+            if isinstance(network, MemoryNetwork)
+            else (str(network) if network else None)
+        )
         sql = "SELECT * FROM memories WHERE 1=1"
         params: list[Any] = []
 
@@ -315,7 +332,7 @@ class MemoryDB:
         rows = cursor.fetchall()
         return [self._row_to_memory_item(r) for r in rows]
 
-    def get_active_beliefs(self, wing: Optional[str] = None) -> list[MemoryItem]:
+    def get_active_beliefs(self, wing: str | None = None) -> list[MemoryItem]:
         return self.query_memories(
             network=MemoryNetwork.BELIEFS,
             wing=wing,
@@ -354,7 +371,7 @@ class MemoryDB:
         entity_name: str,
         entity_type: str,
         summary: str,
-        attributes: Optional[dict[str, Any]] = None,
+        attributes: dict[str, Any] | None = None,
     ) -> str:
         now = time.time()
         with self.conn:
@@ -379,7 +396,7 @@ class MemoryDB:
             )
         return entity_name
 
-    def get_entity(self, entity_name: str) -> Optional[dict[str, Any]]:
+    def get_entity(self, entity_name: str) -> dict[str, Any] | None:
         cursor = self.conn.execute("SELECT * FROM entities WHERE entity_name = ?;", (entity_name,))
         row = cursor.fetchone()
         if row:

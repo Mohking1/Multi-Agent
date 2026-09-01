@@ -1,8 +1,9 @@
 """Document parser specialist subagent wrapping Docling, TableFormer, and HybridChunker."""
-import os
-from typing import Any, Optional
 
-from config import WorkOSConfig, get_config
+import os
+from typing import Any
+
+from config import WorkOSConfig
 from workos_engine.agents.base import BaseSubagent
 from workos_engine.tools.doc_tools import DocToolKit
 from workos_engine.types import ExecutionResult, SubagentTask
@@ -22,8 +23,8 @@ class DocAgent(BaseSubagent):
 
     def __init__(
         self,
-        config: Optional[WorkOSConfig] = None,
-        toolkit: Optional[DocToolKit] = None,
+        config: WorkOSConfig | None = None,
+        toolkit: DocToolKit | None = None,
     ):
         super().__init__(config=config)
         self.toolkit = toolkit or DocToolKit(config=self.config)
@@ -48,7 +49,11 @@ class DocAgent(BaseSubagent):
                             artifacts.append(img_path)
             elif instruction in ("structure_aware_chunk", "chunk", "chunk_document"):
                 data = self.toolkit.structure_aware_chunk(**ctx)
-            elif instruction in ("get_stored_document", "get_document", "fetch_document"):
+            elif instruction in (
+                "get_stored_document",
+                "get_document",
+                "fetch_document",
+            ):
                 data = self.toolkit.get_stored_document(**ctx)
             elif instruction in ("list_stored_documents", "list_documents"):
                 data = self.toolkit.list_stored_documents()

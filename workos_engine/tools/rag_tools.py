@@ -1,12 +1,12 @@
 """Elasticsearch Parent-Child Hybrid RAG ToolKit for WorkOS."""
+
 import hashlib
 import logging
 import math
 import os
 import re
-import time
 from collections import Counter
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -31,35 +31,190 @@ class RAGToolKit:
     """
 
     STOP_WORDS = {
-        "a", "about", "above", "after", "again", "against", "all", "am", "an", "and",
-        "any", "are", "aren't", "as", "at", "be", "because", "been", "before", "being",
-        "below", "between", "both", "but", "by", "can't", "cannot", "could", "couldn't",
-        "did", "didn't", "do", "does", "doesn't", "doing", "don't", "down", "during",
-        "each", "few", "for", "from", "further", "had", "hadn't", "has", "hasn't",
-        "have", "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here",
-        "here's", "hers", "herself", "him", "himself", "his", "how", "how's", "i",
-        "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it",
-        "it's", "its", "itself", "let's", "me", "more", "most", "mustn't", "my",
-        "myself", "no", "nor", "not", "of", "off", "on", "once", "only", "or",
-        "other", "ought", "our", "ours", "ourselves", "out", "over", "own", "same",
-        "shan't", "she", "she'd", "she'll", "she's", "should", "shouldn't", "so",
-        "some", "such", "than", "that", "that's", "the", "their", "theirs", "them",
-        "themselves", "then", "there", "there's", "these", "they", "they'd", "they'll",
-        "they're", "they've", "this", "those", "through", "to", "too", "under",
-        "until", "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're",
-        "we've", "were", "weren't", "what", "what's", "when", "when's", "where",
-        "where's", "which", "while", "who", "who's", "whom", "why", "why's", "with",
-        "won't", "would", "wouldn't", "you", "you'd", "you'll", "you're", "you've",
-        "your", "yours", "yourself", "yourselves"
+        "a",
+        "about",
+        "above",
+        "after",
+        "again",
+        "against",
+        "all",
+        "am",
+        "an",
+        "and",
+        "any",
+        "are",
+        "aren't",
+        "as",
+        "at",
+        "be",
+        "because",
+        "been",
+        "before",
+        "being",
+        "below",
+        "between",
+        "both",
+        "but",
+        "by",
+        "can't",
+        "cannot",
+        "could",
+        "couldn't",
+        "did",
+        "didn't",
+        "do",
+        "does",
+        "doesn't",
+        "doing",
+        "don't",
+        "down",
+        "during",
+        "each",
+        "few",
+        "for",
+        "from",
+        "further",
+        "had",
+        "hadn't",
+        "has",
+        "hasn't",
+        "have",
+        "haven't",
+        "having",
+        "he",
+        "he'd",
+        "he'll",
+        "he's",
+        "her",
+        "here",
+        "here's",
+        "hers",
+        "herself",
+        "him",
+        "himself",
+        "his",
+        "how",
+        "how's",
+        "i",
+        "i'd",
+        "i'll",
+        "i'm",
+        "i've",
+        "if",
+        "in",
+        "into",
+        "is",
+        "isn't",
+        "it",
+        "it's",
+        "its",
+        "itself",
+        "let's",
+        "me",
+        "more",
+        "most",
+        "mustn't",
+        "my",
+        "myself",
+        "no",
+        "nor",
+        "not",
+        "of",
+        "off",
+        "on",
+        "once",
+        "only",
+        "or",
+        "other",
+        "ought",
+        "our",
+        "ours",
+        "ourselves",
+        "out",
+        "over",
+        "own",
+        "same",
+        "shan't",
+        "she",
+        "she'd",
+        "she'll",
+        "she's",
+        "should",
+        "shouldn't",
+        "so",
+        "some",
+        "such",
+        "than",
+        "that",
+        "that's",
+        "the",
+        "their",
+        "theirs",
+        "them",
+        "themselves",
+        "then",
+        "there",
+        "there's",
+        "these",
+        "they",
+        "they'd",
+        "they'll",
+        "they're",
+        "they've",
+        "this",
+        "those",
+        "through",
+        "to",
+        "too",
+        "under",
+        "until",
+        "up",
+        "very",
+        "was",
+        "wasn't",
+        "we",
+        "we'd",
+        "we'll",
+        "we're",
+        "we've",
+        "were",
+        "weren't",
+        "what",
+        "what's",
+        "when",
+        "when's",
+        "where",
+        "where's",
+        "which",
+        "while",
+        "who",
+        "who's",
+        "whom",
+        "why",
+        "why's",
+        "with",
+        "won't",
+        "would",
+        "wouldn't",
+        "you",
+        "you'd",
+        "you'll",
+        "you're",
+        "you've",
+        "your",
+        "yours",
+        "yourself",
+        "yourselves",
     }
 
     def __init__(
         self,
-        config: Optional[WorkOSConfig] = None,
-        es_client: Optional[Any] = None,
-        embedder: Optional[Any] = None,
-        doc_toolkit: Optional[DocToolKit] = None,
-        model_client: Optional[Any] = None,
+        config: WorkOSConfig | None = None,
+        es_client: Any | None = None,
+        embedder: Any | None = None,
+        doc_toolkit: DocToolKit | None = None,
+        model_client: Any | None = None,
+        vault: Any | None = None,
     ):
         self.config = config or get_config()
         self.es_url = self.config.elasticsearch_url
@@ -67,6 +222,15 @@ class RAGToolKit:
         self.parent_index_name = f"{self.index_name}_parents"
         self.embedder = embedder
         self.doc_toolkit = doc_toolkit
+        if vault is not None:
+            self.vault = vault
+        elif doc_toolkit is not None and hasattr(doc_toolkit, "vault"):
+            self.vault = doc_toolkit.vault
+        else:
+            from workos_engine.vault import DocumentVault
+
+            self.vault = DocumentVault()
+
         if model_client is not None:
             self.model_client = model_client
         else:
@@ -94,7 +258,7 @@ class RAGToolKit:
         except Exception:
             return None
 
-    def _init_elasticsearch(self) -> Optional[Any]:
+    def _init_elasticsearch(self) -> Any | None:
         """Initializes Elasticsearch client if available and reachable."""
         if Elasticsearch is None:
             return None
@@ -178,24 +342,48 @@ class RAGToolKit:
         # 1. Stop words vs rare/domain tokens
         stop_count = sum(1 for t in tokens if t in self.STOP_WORDS)
         stop_word_ratio = stop_count / token_count
-        rare_tokens = [t for t in tokens if t not in self.STOP_WORDS and (len(t) >= 4 or any(c.isdigit() for c in t))]
+        rare_tokens = [
+            t
+            for t in tokens
+            if t not in self.STOP_WORDS and (len(t) >= 4 or any(c.isdigit() for c in t))
+        ]
         rare_token_ratio = len(rare_tokens) / token_count
 
         # 2. Exact identifiers check (e.g. INV-1234, #101, UUID, uppercase acronyms)
-        has_identifier = bool(
-            re.search(r"#[A-Za-z0-9_-]+|\b[A-Z]{2,}-\d+\b|\b\d{4,}\b", raw_query)
-        )
+        has_identifier = bool(re.search(r"#[A-Za-z0-9_-]+|\b[A-Z]{2,}-\d+\b|\b\d{4,}\b", raw_query))
 
         # 3. Shannon Entropy of token distribution
         counts = Counter(tokens)
-        entropy = -sum((cnt / token_count) * math.log2(cnt / token_count) for cnt in counts.values())
+        entropy = -sum(
+            (cnt / token_count) * math.log2(cnt / token_count) for cnt in counts.values()
+        )
 
         # 4. Multi-hop and complex reasoning keywords
         reasoning_keywords = {
-            "compare", "comparison", "difference", "versus", "vs", "analyze", "analysis",
-            "why", "synthesize", "synthesis", "evaluate", "evaluation", "trend", "trends",
-            "breakdown", "across", "relationship", "impact", "correlate", "correlation",
-            "bottlenecks", "factors", "root", "cause"
+            "compare",
+            "comparison",
+            "difference",
+            "versus",
+            "vs",
+            "analyze",
+            "analysis",
+            "why",
+            "synthesize",
+            "synthesis",
+            "evaluate",
+            "evaluation",
+            "trend",
+            "trends",
+            "breakdown",
+            "across",
+            "relationship",
+            "impact",
+            "correlate",
+            "correlation",
+            "bottlenecks",
+            "factors",
+            "root",
+            "cause",
         }
         reasoning_matches = [t for t in tokens if t in reasoning_keywords]
         reasoning_weight = min(1.0, len(reasoning_matches) * 0.35)
@@ -276,12 +464,14 @@ class RAGToolKit:
         current_parent_text = ""
 
         def flush_parent(p_text: str, p_id: str):
-            parents.append({
-                "parent_id": p_id,
-                "doc_id": doc_id,
-                "text": p_text,
-                "parent_index": parent_idx,
-            })
+            parents.append(
+                {
+                    "parent_id": p_id,
+                    "doc_id": doc_id,
+                    "text": p_text,
+                    "parent_index": parent_idx,
+                }
+            )
             words = p_text.split()
             if not words:
                 return
@@ -293,14 +483,16 @@ class RAGToolKit:
                 chunk_words = words[start:end]
                 chunk_text = " ".join(chunk_words)
                 child_id = f"{p_id}_c{c_idx}"
-                children.append({
-                    "chunk_id": child_id,
-                    "doc_id": doc_id,
-                    "parent_id": p_id,
-                    "text": chunk_text,
-                    "chunk_index": c_idx,
-                    "vector": self._get_embedding(chunk_text),
-                })
+                children.append(
+                    {
+                        "chunk_id": child_id,
+                        "doc_id": doc_id,
+                        "parent_id": p_id,
+                        "text": chunk_text,
+                        "chunk_index": c_idx,
+                        "vector": self._get_embedding(chunk_text),
+                    }
+                )
                 c_idx += 1
                 if end >= len(words):
                     break
@@ -325,8 +517,8 @@ class RAGToolKit:
     def rag_ingest_pdf(
         self,
         file_path: str,
-        doc_id: Optional[str] = None,
-        metadata: Optional[dict[str, Any]] = None,
+        doc_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Ingests a PDF or text document into the Elasticsearch parent-child hybrid index.
 
@@ -360,7 +552,7 @@ class RAGToolKit:
         # 2. Fallback direct text reading
         if not text_content:
             try:
-                with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
+                with open(abs_path, encoding="utf-8", errors="ignore") as f:
                     text_content = f.read()
             except Exception as e:
                 raise RuntimeError(f"Failed to read document text: {e}")
@@ -435,11 +627,13 @@ class RAGToolKit:
             }
 
         for c in children:
-            self._in_memory_children.append({
-                **c,
-                "metadata": meta,
-                "file_path": abs_path,
-            })
+            self._in_memory_children.append(
+                {
+                    **c,
+                    "metadata": meta,
+                    "file_path": abs_path,
+                }
+            )
 
         return {
             "doc_id": doc_id,
@@ -453,8 +647,8 @@ class RAGToolKit:
     def ingest_document(
         self,
         file_path: str,
-        doc_id: Optional[str] = None,
-        metadata: Optional[dict[str, Any]] = None,
+        doc_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Alias for rag_ingest_pdf."""
         return self.rag_ingest_pdf(file_path=file_path, doc_id=doc_id, metadata=metadata)
@@ -463,7 +657,7 @@ class RAGToolKit:
         """Computes cosine similarity between two vector lists."""
         if not v1 or not v2 or len(v1) != len(v2):
             return 0.0
-        dot = sum(a * b for a, b in zip(v1, v2))
+        dot = sum(a * b for a, b in zip(v1, v2, strict=False))
         norm1 = math.sqrt(sum(a * a for a in v1))
         norm2 = math.sqrt(sum(b * b for b in v2))
         if norm1 <= 1e-9 or norm2 <= 1e-9:
@@ -496,7 +690,7 @@ class RAGToolKit:
         query: str,
         top_k: int = 5,
         alpha: float = 0.5,
-        filter_metadata: Optional[dict[str, Any]] = None,
+        filter_metadata: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Performs hybrid search combining BM25 lexical ranking and dense vector similarity
 
@@ -532,15 +726,17 @@ class RAGToolKit:
                             if not parent_text and parent_id in self._in_memory_parents:
                                 parent_text = self._in_memory_parents[parent_id].get("text", "")
 
-                        results.append({
-                            "chunk_id": source.get("chunk_id", h.get("_id", "")),
-                            "doc_id": source.get("doc_id", ""),
-                            "parent_id": parent_id,
-                            "text": source.get("text", ""),
-                            "parent_text": parent_text or source.get("text", ""),
-                            "score": float(h.get("_score", 1.0)),
-                            "metadata": source.get("metadata", {}),
-                        })
+                        results.append(
+                            {
+                                "chunk_id": source.get("chunk_id", h.get("_id", "")),
+                                "doc_id": source.get("doc_id", ""),
+                                "parent_id": parent_id,
+                                "text": source.get("text", ""),
+                                "parent_text": parent_text or source.get("text", ""),
+                                "score": float(h.get("_score", 1.0)),
+                                "metadata": source.get("metadata", {}),
+                            }
+                        )
                     return results
             except Exception:
                 pass
@@ -557,11 +753,13 @@ class RAGToolKit:
         for child in self._in_memory_children:
             bm25_score = self._compute_bm25_score(query_tokens, child["text"])
             dense_score = self._compute_cosine_sim(query_vec, child.get("vector", []))
-            scored_items.append({
-                "child": child,
-                "bm25_score": bm25_score,
-                "dense_score": dense_score,
-            })
+            scored_items.append(
+                {
+                    "child": child,
+                    "bm25_score": bm25_score,
+                    "dense_score": dense_score,
+                }
+            )
 
         # 2. Sort for ranks
         scored_items.sort(key=lambda x: x["bm25_score"], reverse=True)
@@ -591,15 +789,17 @@ class RAGToolKit:
             if parent_id in self._in_memory_parents:
                 parent_text = self._in_memory_parents[parent_id].get("text", "")
 
-            results.append({
-                "chunk_id": c.get("chunk_id", ""),
-                "doc_id": c.get("doc_id", ""),
-                "parent_id": parent_id,
-                "text": c.get("text", ""),
-                "parent_text": parent_text or c.get("text", ""),
-                "score": round(item["rrf_score"] * 100.0, 4),
-                "metadata": c.get("metadata", {}),
-            })
+            results.append(
+                {
+                    "chunk_id": c.get("chunk_id", ""),
+                    "doc_id": c.get("doc_id", ""),
+                    "parent_id": parent_id,
+                    "text": c.get("text", ""),
+                    "parent_text": parent_text or c.get("text", ""),
+                    "score": round(item["rrf_score"] * 100.0, 4),
+                    "metadata": c.get("metadata", {}),
+                }
+            )
 
         return results
 
@@ -608,7 +808,7 @@ class RAGToolKit:
         query: str,
         top_k: int = 5,
         alpha: float = 0.5,
-        filter_metadata: Optional[dict[str, Any]] = None,
+        filter_metadata: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Alias for search."""
         return self.search(query=query, top_k=top_k, alpha=alpha, filter_metadata=filter_metadata)
@@ -618,7 +818,7 @@ class RAGToolKit:
         query: str,
         top_k: int = 5,
         alpha: float = 0.5,
-        filter_metadata: Optional[dict[str, Any]] = None,
+        filter_metadata: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Alias for search."""
         return self.search(query=query, top_k=top_k, alpha=alpha, filter_metadata=filter_metadata)
@@ -654,14 +854,21 @@ class RAGToolKit:
             parent_id = hit.get("parent_id", "")
 
             snippet = chunk_text if len(chunk_text) <= 200 else f"{chunk_text[:197]}..."
-            citations.append({
-                "citation_id": f"[{idx}]",
-                "doc_id": doc_id,
-                "chunk_id": chunk_id,
-                "parent_id": parent_id,
-                "snippet": snippet,
-                "score": hit.get("score", 0.0),
-            })
+            vault_doc = self.vault.get_document(doc_id) if hasattr(self, "vault") else None
+            citations.append(
+                {
+                    "citation_id": f"[{idx}]",
+                    "doc_id": doc_id,
+                    "filename": vault_doc.filename if vault_doc else f"{doc_id}.pdf",
+                    "vault_path": vault_doc.vault_path if vault_doc else "",
+                    "file_size": vault_doc.file_size_bytes if vault_doc else 0,
+                    "mime_type": vault_doc.mime_type if vault_doc else "application/pdf",
+                    "chunk_id": chunk_id,
+                    "parent_id": parent_id,
+                    "snippet": snippet,
+                    "score": hit.get("score", 0.0),
+                }
+            )
             context_blocks.append(f"[{idx}] (Doc: {doc_id}): {parent_text or chunk_text}")
 
         joined_context = "\n\n".join(context_blocks)
@@ -695,7 +902,11 @@ class RAGToolKit:
             text = hit.get("text", "")
             sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
             for s in sentences:
-                if any(w.lower() in s.lower() for w in re.findall(r"\w+", query) if w.lower() not in self.STOP_WORDS):
+                if any(
+                    w.lower() in s.lower()
+                    for w in re.findall(r"\w+", query)
+                    if w.lower() not in self.STOP_WORDS
+                ):
                     relevant_sentences.append(f"{s} [{idx}]")
             if not relevant_sentences and sentences:
                 relevant_sentences.append(f"{sentences[0]} [{idx}]")

@@ -1,18 +1,16 @@
 """WorkOS Interactive Console & Executive CLI Entrypoint."""
+
 import argparse
 import asyncio
 import inspect
-import os
 import shlex
-import sys
-from typing import Any, Optional
+from typing import Any
 
-from rich.box import ROUNDED, SIMPLE
+from rich.box import ROUNDED
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.prompt import Confirm, Prompt
-from rich.status import Status
+from rich.prompt import Prompt
 from rich.table import Table
 from rich.text import Text
 
@@ -24,8 +22,6 @@ from workos_engine.types import (
     AutonomyLevel,
     ExecutionPlan,
     ExecutionResult,
-    MemoryItem,
-    MemoryNetwork,
     PlanStep,
     SubagentTask,
 )
@@ -40,9 +36,9 @@ class WorkOSApp:
 
     def __init__(
         self,
-        config: Optional[WorkOSConfig] = None,
-        planner: Optional[ExecutivePlanner] = None,
-        console: Optional[Console] = None,
+        config: WorkOSConfig | None = None,
+        planner: ExecutivePlanner | None = None,
+        console: Console | None = None,
     ):
         self.config = config or get_config()
         self.console = console or Console()
@@ -53,7 +49,10 @@ class WorkOSApp:
     def display_banner(self) -> None:
         """Renders the executive WorkOS banner and active system status."""
         title = Text("WorkOS — Personal Executive AI Operating System", style="bold cyan")
-        subtitle = Text(f"v{__version__} | Autonomous Multi-Agent Orchestration & Cognitive Memory", style="dim white")
+        subtitle = Text(
+            f"v{__version__} | Autonomous Multi-Agent Orchestration & Cognitive Memory",
+            style="dim white",
+        )
 
         status_table = Table.grid(padding=(0, 2))
         status_table.add_column(style="bold yellow", justify="right")
@@ -61,11 +60,33 @@ class WorkOSApp:
         status_table.add_column(style="bold yellow", justify="right")
         status_table.add_column(style="white")
 
-        autonomy_style = "bold green" if self.config.autonomy_level == AutonomyLevel.FULL else "bold yellow"
-        status_table.add_row("Ollama URL:", f"{self.config.ollama_base_url}", "Autonomy Policy:", f"[{autonomy_style}]{self.config.autonomy_level.value}[/]")
-        status_table.add_row("Model:", f"{self.config.model_name}", "Embeddings:", f"{self.config.embedding_model}")
-        status_table.add_row("Memory DB:", f"{self.config.memory_db_path}", "Elasticsearch:", f"{self.config.elasticsearch_url}")
-        status_table.add_row("Subagents:", "mail_agent, doc_agent, rag_agent", "Trusted Recip:", f"{len(self.config.trusted_recipients)} configured")
+        autonomy_style = (
+            "bold green" if self.config.autonomy_level == AutonomyLevel.FULL else "bold yellow"
+        )
+        status_table.add_row(
+            "Ollama URL:",
+            f"{self.config.ollama_base_url}",
+            "Autonomy Policy:",
+            f"[{autonomy_style}]{self.config.autonomy_level.value}[/]",
+        )
+        status_table.add_row(
+            "Model:",
+            f"{self.config.model_name}",
+            "Embeddings:",
+            f"{self.config.embedding_model}",
+        )
+        status_table.add_row(
+            "Memory DB:",
+            f"{self.config.memory_db_path}",
+            "Elasticsearch:",
+            f"{self.config.elasticsearch_url}",
+        )
+        status_table.add_row(
+            "Subagents:",
+            "mail_agent, doc_agent, rag_agent",
+            "Trusted Recip:",
+            f"{len(self.config.trusted_recipients)} configured",
+        )
 
         banner_panel = Panel(
             status_table,
@@ -76,7 +97,9 @@ class WorkOSApp:
             padding=(1, 2),
         )
         self.console.print(banner_panel)
-        self.console.print("[dim]Type [bold cyan]/help[/bold cyan] for slash commands or enter any natural language goal to execute.[/dim]\n")
+        self.console.print(
+            "[dim]Type [bold cyan]/help[/bold cyan] for slash commands or enter any natural language goal to execute.[/dim]\n"
+        )
 
     def display_help(self) -> None:
         """Renders comprehensive help table for slash commands and natural language goals."""
@@ -90,14 +113,30 @@ class WorkOSApp:
         table.add_row("/model", "<model_name>", "Switch active Ollama model")
         table.add_row("/policy", "[FULL | SUPERVISED]", "View or switch system autonomy policy")
         table.add_row("/plan", "<goal>", "Preview dynamic execution plan without executing")
-        table.add_row("/memory", "[summary | loci]", "Display spatial Loci memory architecture summary")
-        table.add_row("/memory search", "<query>", "Search 4-network cognitive memory with BM25 FTS5")
+        table.add_row(
+            "/memory",
+            "[summary | loci]",
+            "Display spatial Loci memory architecture summary",
+        )
+        table.add_row(
+            "/memory search",
+            "<query>",
+            "Search 4-network cognitive memory with BM25 FTS5",
+        )
         table.add_row("/memory beliefs", "[wing]", "List active user beliefs & behavioral rules")
-        table.add_row("/memory add", "<wing> <hall> <k> <val>", "Retain a verified fact directly into memory")
+        table.add_row(
+            "/memory add",
+            "<wing> <hall> <k> <val>",
+            "Retain a verified fact directly into memory",
+        )
         table.add_row("/mail status", "", "Check IMAP/SMTP connectivity and configuration")
         table.add_row("/mail search", "<query>", "Search mailbox for matching emails")
         table.add_row("/mail draft", "<to> <subject> <body>", "Create email draft in mailbox")
-        table.add_row("/mail send", "<to> <subject> <body>", "Send email (subject to autonomy policy)")
+        table.add_row(
+            "/mail send",
+            "<to> <subject> <body>",
+            "Send email (subject to autonomy policy)",
+        )
         table.add_row("/doc parse", "<file_path>", "Parse document using Docling parser")
         table.add_row("/doc tables", "<file_path>", "Extract structured tables from document")
         table.add_row("/rag search", "<query>", "Perform hybrid RRF search across Elasticsearch")
@@ -107,11 +146,18 @@ class WorkOSApp:
         table.add_row("/exit", "", "Exit WorkOS console (/quit, /q)")
 
         self.console.print(table)
-        self.console.print("\n[dim]Natural Language Input: Simply type any request (e.g. 'Search emails for invoice from Arvind, parse the PDF, and tell me the total amount').[/dim]\n")
+        self.console.print(
+            "\n[dim]Natural Language Input: Simply type any request (e.g. 'Search emails for invoice from Arvind, parse the PDF, and tell me the total amount').[/dim]\n"
+        )
 
     def render_plan(self, plan: ExecutionPlan) -> None:
         """Renders an ExecutionPlan object as a structured Rich Table."""
-        table = Table(title=f"Execution Plan: {plan.goal}", box=ROUNDED, header_style="bold magenta", expand=True)
+        table = Table(
+            title=f"Execution Plan: {plan.goal}",
+            box=ROUNDED,
+            header_style="bold magenta",
+            expand=True,
+        )
         table.add_column("Step", style="bold cyan", width=6, justify="center")
         table.add_column("Agent", style="bold yellow", width=14)
         table.add_column("Description", style="white", overflow="fold")
@@ -127,7 +173,11 @@ class WorkOSApp:
 
         for step in plan.steps:
             status_text = status_colors.get(step.status, step.status)
-            inputs_str = ", ".join(f"{k}={v}" for k, v in step.input_data.items()) if step.input_data else "-"
+            inputs_str = (
+                ", ".join(f"{k}={v}" for k, v in step.input_data.items())
+                if step.input_data
+                else "-"
+            )
             table.add_row(
                 str(step.step_id),
                 step.assigned_agent,
@@ -155,7 +205,9 @@ class WorkOSApp:
         self.console.print(f"\n[bold cyan]✦ Goal:[/] [white]{goal}[/]")
 
         # 1. Plan generation
-        with self.console.status("[bold cyan]Formulating executive plan...[/bold cyan]", spinner="dots"):
+        with self.console.status(
+            "[bold cyan]Formulating executive plan...[/bold cyan]", spinner="dots"
+        ):
             context = self.planner.build_planning_context(goal)
             plan = self.planner.generate_plan(goal, context=context)
 
@@ -168,15 +220,17 @@ class WorkOSApp:
         # 2. Execution phase with live status
         self.console.print("\n[bold cyan]✦ Executing Plan Steps:[/]")
         completed_steps: dict[int, PlanStep] = {}
-        prev_step: Optional[PlanStep] = None
+        prev_step: PlanStep | None = None
 
         for step in plan.steps:
             step.status = "in_progress"
             step_label = f"Step {step.step_id} [{step.assigned_agent}]: {step.description}"
-            
+
             with self.console.status(f"[yellow]{step_label}...[/yellow]", spinner="dots"):
-                step.input_data = _resolve_variables_in_dict(step.input_data, completed_steps, prev_step)
-                
+                step.input_data = _resolve_variables_in_dict(
+                    step.input_data, completed_steps, prev_step
+                )
+
                 agent = self.planner.agents.get(step.assigned_agent)
                 if not agent:
                     step.status = "failed"
@@ -213,21 +267,32 @@ class WorkOSApp:
 
             # Step outcome reporting
             if step.status == "completed":
-                self.console.print(f"  [bold green]✓[/bold green] [white]Step {step.step_id}: {step.description}[/white]")
+                self.console.print(
+                    f"  [bold green]✓[/bold green] [white]Step {step.step_id}: {step.description}[/white]"
+                )
                 if step.result and step.result.artifacts:
                     for art in step.result.artifacts:
-                        self.console.print(f"    [dim cyan]Artifact saved:[/] [underline]{art}[/underline]")
+                        self.console.print(
+                            f"    [dim cyan]Artifact saved:[/] [underline]{art}[/underline]"
+                        )
             else:
                 err = step.result.error if step.result else "Unknown error"
-                self.console.print(f"  [bold red]✗[/bold red] [white]Step {step.step_id} Failed:[/] [red]{err}[/red]")
+                self.console.print(
+                    f"  [bold red]✗[/bold red] [white]Step {step.step_id} Failed:[/] [red]{err}[/red]"
+                )
 
         # 3. Final synthesis
-        with self.console.status("[bold cyan]Synthesizing final executive response...[/bold cyan]", spinner="dots"):
+        with self.console.status(
+            "[bold cyan]Synthesizing final executive response...[/bold cyan]",
+            spinner="dots",
+        ):
             final_summary = self.planner.synthesize_response(plan)
 
         # Render final output
         synthesis_panel = Panel(
-            Markdown(final_summary) if "\n" in final_summary else Text(final_summary, style="white"),
+            Markdown(final_summary)
+            if "\n" in final_summary
+            else Text(final_summary, style="white"),
             title="[bold green]WorkOS Executive Output[/bold green]",
             box=ROUNDED,
             border_style="green",
@@ -288,7 +353,7 @@ class WorkOSApp:
                 if not args:
                     self.console.print("[red]Usage: /plan <goal description>[/red]")
                     return True
-                goal_str = line[len(cmd):].strip()
+                goal_str = line[len(cmd) :].strip()
                 await self.execute_goal(goal_str, plan_only=True)
                 return True
 
@@ -305,7 +370,9 @@ class WorkOSApp:
                 return await self._handle_doc_cmd(args)
 
             else:
-                self.console.print(f"[red]Unknown slash command: {cmd}. Type /help for available commands.[/red]")
+                self.console.print(
+                    f"[red]Unknown slash command: {cmd}. Type /help for available commands.[/red]"
+                )
                 return True
 
         # Natural language goal execution
@@ -332,12 +399,21 @@ class WorkOSApp:
 
             if models:
                 for m in models:
-                    is_active = "[bold green]ACTIVE[/bold green]" if m == self.config.model_name else "available"
+                    is_active = (
+                        "[bold green]ACTIVE[/bold green]"
+                        if m == self.config.model_name
+                        else "available"
+                    )
                     table.add_row(m, is_active)
             else:
-                table.add_row("(No models returned from Ollama)", "[red]Check if Ollama is running[/red]")
+                table.add_row(
+                    "(No models returned from Ollama)",
+                    "[red]Check if Ollama is running[/red]",
+                )
             self.console.print(table)
-            self.console.print(f"[dim]Current active model: [bold yellow]{self.config.model_name}[/bold yellow]. Use [cyan]/model <name>[/cyan] to switch.[/dim]")
+            self.console.print(
+                f"[dim]Current active model: [bold yellow]{self.config.model_name}[/bold yellow]. Use [cyan]/model <name>[/cyan] to switch.[/dim]"
+            )
             return True
 
         new_model = args[0]
@@ -363,7 +439,9 @@ class WorkOSApp:
             )
             table.add_row(
                 "Trusted Recipients",
-                ", ".join(self.config.trusted_recipients) if self.config.trusted_recipients else "(none)",
+                ", ".join(self.config.trusted_recipients)
+                if self.config.trusted_recipients
+                else "(none)",
                 "Recipients allowed for automated email dispatch.",
             )
             self.console.print(table)
@@ -375,9 +453,13 @@ class WorkOSApp:
             self.config.autonomy_level = new_level
             self.planner.config.autonomy_level = new_level
             self.planner.mail_agent.config.autonomy_level = new_level
-            self.console.print(f"[green]✓ Autonomy level updated to: [bold]{new_level.value}[/bold][/green]")
+            self.console.print(
+                f"[green]✓ Autonomy level updated to: [bold]{new_level.value}[/bold][/green]"
+            )
         else:
-            self.console.print("[red]Invalid autonomy level. Choose either 'FULL' or 'SUPERVISED'.[/red]")
+            self.console.print(
+                "[red]Invalid autonomy level. Choose either 'FULL' or 'SUPERVISED'.[/red]"
+            )
         return True
 
     async def _handle_memory_cmd(self, args: list[str]) -> bool:
@@ -445,11 +527,15 @@ class WorkOSApp:
             wing, hall, key = args[1], args[2], args[3]
             content = " ".join(args[4:])
             item_id = self.memory.retain_fact(wing=wing, hall=hall, key=key, content=content)
-            self.console.print(f"[green]✓ Fact retained in memory (ID: {item_id}) under [{wing}/{hall}][/green]")
+            self.console.print(
+                f"[green]✓ Fact retained in memory (ID: {item_id}) under [{wing}/{hall}][/green]"
+            )
             return True
 
         else:
-            self.console.print(f"[red]Unknown memory subcommand: {subcmd}. Use summary, search, beliefs, or add.[/red]")
+            self.console.print(
+                f"[red]Unknown memory subcommand: {subcmd}. Use summary, search, beliefs, or add.[/red]"
+            )
             return True
 
     async def _handle_mail_cmd(self, args: list[str]) -> bool:
@@ -459,9 +545,15 @@ class WorkOSApp:
             table.add_column("Setting", style="bold yellow")
             table.add_column("Value", style="white")
 
-            table.add_row("IMAP Host:", f"{self.config.imap_host or 'Not set'}:{self.config.imap_port}")
+            table.add_row(
+                "IMAP Host:",
+                f"{self.config.imap_host or 'Not set'}:{self.config.imap_port}",
+            )
             table.add_row("IMAP User:", f"{self.config.imap_user or 'Not set'}")
-            table.add_row("SMTP Host:", f"{self.config.smtp_host or 'Not set'}:{self.config.smtp_port}")
+            table.add_row(
+                "SMTP Host:",
+                f"{self.config.smtp_host or 'Not set'}:{self.config.smtp_port}",
+            )
             table.add_row("SMTP User:", f"{self.config.smtp_user or 'Not set'}")
             table.add_row("Autonomy:", f"{self.config.autonomy_level.value}")
             self.console.print(table)
@@ -476,7 +568,9 @@ class WorkOSApp:
                 emails = res.data.get("emails", []) if isinstance(res.data, dict) else res.data
                 self.console.print(f"[green]Found {len(emails)} matching emails.[/green]")
                 for em in emails[:5]:
-                    self.console.print(f"  • [bold]{em.get('subject', 'No Subject')}[/] from [cyan]{em.get('sender', '')}[/] ({em.get('date', '')})")
+                    self.console.print(
+                        f"  • [bold]{em.get('subject', 'No Subject')}[/] from [cyan]{em.get('sender', '')}[/] ({em.get('date', '')})"
+                    )
             else:
                 self.console.print(f"[red]Mail search error: {res.error}[/red]")
             return True
@@ -488,7 +582,12 @@ class WorkOSApp:
             to_email, subject = args[1], args[2]
             body = " ".join(args[3:])
             instr = "send_email" if subcmd == "send" else "create_draft"
-            task = SubagentTask("mail_cli", "mail_agent", instr, {"to_email": to_email, "subject": subject, "body": body})
+            task = SubagentTask(
+                "mail_cli",
+                "mail_agent",
+                instr,
+                {"to_email": to_email, "subject": subject, "body": body},
+            )
             res = await self._dispatch_agent(self.planner.mail_agent, task)
             if res.success:
                 self.console.print(f"[green]✓ Email {subcmd} action completed: {res.data}[/green]")
@@ -503,7 +602,9 @@ class WorkOSApp:
     async def _handle_rag_cmd(self, args: list[str]) -> bool:
         """Handles /rag subcommands."""
         if not args:
-            self.console.print("[red]Usage: /rag [search <query> | ingest <file> | ask <query>][/red]")
+            self.console.print(
+                "[red]Usage: /rag [search <query> | ingest <file> | ask <query>][/red]"
+            )
             return True
 
         subcmd = args[0].lower()
@@ -517,13 +618,21 @@ class WorkOSApp:
                 self.console.print(f"[green]Found {len(hits)} relevant knowledge chunks:[/green]")
                 for h in hits[:5]:
                     txt = h.get("text", "") if isinstance(h, dict) else str(h)
-                    self.console.print(Panel(txt[:300], title=f"Score: {h.get('score', 'N/A') if isinstance(h, dict) else ''}", box=ROUNDED))
+                    self.console.print(
+                        Panel(
+                            txt[:300],
+                            title=f"Score: {h.get('score', 'N/A') if isinstance(h, dict) else ''}",
+                            box=ROUNDED,
+                        )
+                    )
             else:
                 self.console.print(f"[red]RAG search failed: {res.error}[/red]")
             return True
 
         elif subcmd == "ingest":
-            task = SubagentTask("rag_cli", "rag_agent", "rag_ingest_pdf", {"file_path": query_or_file})
+            task = SubagentTask(
+                "rag_cli", "rag_agent", "rag_ingest_pdf", {"file_path": query_or_file}
+            )
             res = await self._dispatch_agent(self.planner.rag_agent, task)
             if res.success:
                 self.console.print(f"[green]✓ Document ingested into RAG: {res.data}[/green]")
@@ -536,7 +645,9 @@ class WorkOSApp:
             res = await self._dispatch_agent(self.planner.rag_agent, task)
             if res.success:
                 ans = res.data.get("answer", res.data) if isinstance(res.data, dict) else res.data
-                self.console.print(Panel(str(ans), title="RAG Answer", box=ROUNDED, border_style="cyan"))
+                self.console.print(
+                    Panel(str(ans), title="RAG Answer", box=ROUNDED, border_style="cyan")
+                )
             else:
                 self.console.print(f"[red]RAG ask failed: {res.error}[/red]")
             return True
@@ -558,9 +669,19 @@ class WorkOSApp:
             task = SubagentTask("doc_cli", "doc_agent", "parse_document", {"file_path": file_path})
             res = await self._dispatch_agent(self.planner.doc_agent, task)
             if res.success:
-                self.console.print(f"[green]✓ Document parsed successfully.[/green]")
-                txt = res.data.get("markdown", str(res.data)) if isinstance(res.data, dict) else str(res.data)
-                self.console.print(Panel(txt[:500] + ("..." if len(txt) > 500 else ""), title=f"Doc Content: {file_path}", box=ROUNDED))
+                self.console.print("[green]✓ Document parsed successfully.[/green]")
+                txt = (
+                    res.data.get("markdown", str(res.data))
+                    if isinstance(res.data, dict)
+                    else str(res.data)
+                )
+                self.console.print(
+                    Panel(
+                        txt[:500] + ("..." if len(txt) > 500 else ""),
+                        title=f"Doc Content: {file_path}",
+                        box=ROUNDED,
+                    )
+                )
             else:
                 self.console.print(f"[red]Doc parsing failed: {res.error}[/red]")
             return True
@@ -600,22 +721,23 @@ class WorkOSApp:
 
 
 def create_app(
-    config: Optional[WorkOSConfig] = None,
-    planner: Optional[ExecutivePlanner] = None,
-    console: Optional[Console] = None,
+    config: WorkOSConfig | None = None,
+    planner: ExecutivePlanner | None = None,
+    console: Console | None = None,
 ) -> WorkOSApp:
     """Factory function to instantiate WorkOSApp."""
     return WorkOSApp(config=config, planner=planner, console=console)
 
 
-def parse_cli_args(args: Optional[list[str]] = None) -> argparse.Namespace:
+def parse_cli_args(args: list[str] | None = None) -> argparse.Namespace:
     """Parses command line arguments."""
     parser = argparse.ArgumentParser(
         description="WorkOS — Personal Executive AI Operating System",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--goal", "-g",
+        "--goal",
+        "-g",
         type=str,
         default=None,
         help="Execute a natural language goal directly in non-interactive mode.",
@@ -626,7 +748,8 @@ def parse_cli_args(args: Optional[list[str]] = None) -> argparse.Namespace:
         help="Generate and display execution plan without executing steps.",
     )
     parser.add_argument(
-        "--autonomy", "-a",
+        "--autonomy",
+        "-a",
         type=str,
         choices=["FULL", "SUPERVISED"],
         default=None,
@@ -637,6 +760,18 @@ def parse_cli_args(args: Optional[list[str]] = None) -> argparse.Namespace:
         type=str,
         default=None,
         help="Path to SQLite cognitive memory database.",
+    )
+    parser.add_argument(
+        "--ui",
+        action="store_true",
+        help="Launch the WorkOS minimalist Web UI dashboard.",
+    )
+    parser.add_argument(
+        "--port",
+        "-p",
+        type=int,
+        default=8000,
+        help="Port to bind the Web UI server (default: 8000).",
     )
     parser.add_argument(
         "--help-commands",
@@ -655,6 +790,21 @@ async def main() -> None:
         config.autonomy_level = AutonomyLevel(cli_args.autonomy)
     if cli_args.memory_db:
         config.memory_db_path = cli_args.memory_db
+
+    if cli_args.ui:
+        import uvicorn
+
+        from workos_engine.ui.app import app as web_app
+
+        Console().print(
+            f"[bold cyan]✦ Launching WorkOS Web UI on:[/] [bold green]http://localhost:{cli_args.port}[/]"
+        )
+        uvicorn_config = uvicorn.Config(
+            web_app, host="0.0.0.0", port=cli_args.port, log_level="info"
+        )
+        server = uvicorn.Server(uvicorn_config)
+        await server.serve()
+        return
 
     app = create_app(config=config)
 

@@ -1,10 +1,11 @@
 import json
 import re
 import uuid
-from typing import Any, Optional
-from workos_engine.types import MemoryItem, MemoryNetwork
+from typing import Any
+
 from workos_engine.memory.db import MemoryDB
 from workos_engine.memory.loci import SpatialLociManager
+from workos_engine.types import MemoryItem, MemoryNetwork
 
 
 class MemoryReflector:
@@ -13,14 +14,14 @@ class MemoryReflector:
     extracting facts, experiences, entities, and beliefs/preferences into memory.
     """
 
-    def __init__(self, loci_manager: Optional[SpatialLociManager] = None):
+    def __init__(self, loci_manager: SpatialLociManager | None = None):
         self.loci = loci_manager or SpatialLociManager()
 
     def reflect_and_update(
         self,
         db: MemoryDB,
         conversation_events: list[Any],
-        model_client: Optional[Any] = None,
+        model_client: Any | None = None,
     ) -> list[str]:
         """
         Consolidates conversation events into structured memory items.
@@ -134,7 +135,9 @@ class MemoryReflector:
                 )
 
             # 3. Experience extraction (e.g. "Processed invoice #101", task completion)
-            if any(k in text.lower() for k in ["completed", "processed", "executed", "task result"]):
+            if any(
+                k in text.lower() for k in ["completed", "processed", "executed", "task result"]
+            ):
                 wing, hall = "workflows", "runs"
                 words = re.findall(r"\w+", text.lower())
                 key = "_".join(words[:3]) if words else "task_run"
@@ -153,7 +156,9 @@ class MemoryReflector:
 
         return items
 
-    def _reflect_with_model(self, conversation_events: list[Any], model_client: Any) -> list[MemoryItem]:
+    def _reflect_with_model(
+        self, conversation_events: list[Any], model_client: Any
+    ) -> list[MemoryItem]:
         """
         Uses Ollama LLM to extract structured memories.
         """

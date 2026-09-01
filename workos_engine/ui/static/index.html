@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WorkOS — Executive AI Operating System</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfeff',
+              500: '#06b6d4',
+              600: '#0891b2',
+              900: '#164e63',
+            },
+            surface: {
+              base: '#0B0F17',
+              card: '#111827',
+              cardHover: '#1F2937',
+              border: '#374151',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Marked for Markdown Rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #0B0F17; }
+    code, pre { font-family: 'JetBrains Mono', monospace; }
+    .prose-dark { color: #E5E7EB; }
+    .prose-dark h1, .prose-dark h2, .prose-dark h3 { color: #F3F4F6; font-weight: 600; margin-top: 1rem; margin-bottom: 0.5rem; }
+    .prose-dark table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.875rem; }
+    .prose-dark th, .prose-dark td { border: 1px solid #374151; padding: 0.5rem 0.75rem; text-align: left; }
+    .prose-dark th { background-color: #1F2937; color: #38BDF8; }
+    .prose-dark ul { list-style-type: disc; margin-left: 1.5rem; }
+    .prose-dark ol { list-style-type: decimal; margin-left: 1.5rem; }
+    .citation-tag { cursor: pointer; color: #38BDF8; background: rgba(56, 189, 248, 0.15); padding: 2px 6px; border-radius: 4px; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.3); transition: all 0.2s; }
+    .citation-tag:hover { background: rgba(56, 189, 248, 0.3); border-color: #38BDF8; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0B0F17; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+  </style>
+</head>
+<body class="text-gray-100 min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-black" x-data="workosApp()">
+
+  <!-- Top Navigation Bar -->
+  <header class="border-b border-gray-800 bg-surface-card/80 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <i class="fa-solid fa-cube text-black font-bold text-sm"></i>
+        </div>
+        <div class="flex items-baseline space-x-2">
+          <span class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">WorkOS</span>
+          <span class="text-xs font-mono text-cyan-400/80 uppercase px-1.5 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/50">Personal OS</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="hidden md:flex items-center space-x-1">
+        <button @click="activeTab = 'console'" :class="activeTab === 'console' ? 'bg-gray-800 text-cyan-400 shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'" class="px-3.5 py-1.5 rounded-md text-sm font-medium transition-all flex items-center space-x-2">
+          <i class="fa-solid fa-terminal text-xs"></i>
+          <span>Workspace</span>
+        </button>
+        <button @click="activeTab = 'vault'" :class="activeTab === 'vault' ? 'bg-gray-800 text-cyan-400 shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'" class="px-3.5 py-1.5 rounded-md text-sm font-medium transition-all flex items-center space-x-2">
+          <i class="fa-solid fa-vault text-xs"></i>
+          <span>Document Vault</span>
+          <span class="text-xs px-1.5 py-0.2 rounded-full bg-gray-700 text-gray-300" x-text="status.documents_count"></span>
+        </button>
+        <button @click="activeTab = 'memory'" :class="activeTab === 'memory' ? 'bg-gray-800 text-cyan-400 shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'" class="px-3.5 py-1.5 rounded-md text-sm font-medium transition-all flex items-center space-x-2">
+          <i class="fa-solid fa-brain text-xs"></i>
+          <span>Cognitive Memory</span>
+        </button>
+        <button @click="activeTab = 'mail'" :class="activeTab === 'mail' ? 'bg-gray-800 text-cyan-400 shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'" class="px-3.5 py-1.5 rounded-md text-sm font-medium transition-all flex items-center space-x-2">
+          <i class="fa-solid fa-envelope text-xs"></i>
+          <span>Mail Specialist</span>
+        </button>
+      </nav>
+
+      <!-- Status Pills & Settings -->
+      <div class="flex items-center space-x-3">
+        <!-- Ollama Model Indicator -->
+        <div class="flex items-center space-x-2 px-2.5 py-1 rounded-full bg-gray-800/80 border border-gray-700 text-xs">
+          <span class="w-2 h-2 rounded-full" :class="status.ollama_online ? 'bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400' : 'bg-rose-500'"></span>
+          <select x-model="status.model_name" @change="switchModel($event.target.value)" class="bg-transparent border-none text-gray-200 font-mono text-xs focus:ring-0 cursor-pointer pr-1">
+            <template x-for="m in status.available_models" :key="m">
+              <option :value="m" x-text="m" class="bg-gray-900 text-gray-200"></option>
+            </template>
+          </select>
+        </div>
+
+        <!-- Autonomy Policy Switcher -->
+        <button @click="togglePolicy()" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-medium transition-all border"
+          :class="status.autonomy_level === 'FULL' ? 'bg-emerald-950/70 text-emerald-400 border-emerald-700/60 shadow-sm shadow-emerald-900/30' : 'bg-amber-950/70 text-amber-300 border-amber-700/60'">
+          <i class="fa-solid" :class="status.autonomy_level === 'FULL' ? 'fa-shield-halved' : 'fa-hand'"></i>
+          <span x-text="status.autonomy_level"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Body -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+    <!-- ==================== TAB 1: EXECUTIVE WORKSPACE ==================== -->
+    <div x-show="activeTab === 'console'" class="space-y-6" x-transition>
+      <!-- Prompt & Goal Input Box -->
+      <div class="bg-surface-card border border-gray-800 rounded-xl p-5 shadow-2xl shadow-black/60 relative overflow-hidden">
+        <div class="absolute -top-24 -right-24 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-sparkles text-cyan-400 text-xs"></i>
+            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Executive Directive</span>
+          </div>
+          <div class="flex items-center space-x-2 text-xs text-gray-400">
+            <span class="text-gray-500 font-mono">Specialists active:</span>
+            <span class="text-cyan-400 font-mono">mail_agent, doc_agent, rag_agent</span>
+          </div>
+        </div>
+
+        <div class="relative">
+          <textarea
+            x-model="goalInput"
+            @keydown.enter.ctrl.prevent="executeCurrentGoal()"
+            placeholder="Instruct your WorkOS (e.g. 'Search my inbox for recent invoice from Arvind, extract the line items table, and index into RAG')..."
+            rows="3"
+            class="w-full bg-gray-950/80 border border-gray-700/80 rounded-lg px-4 py-3 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 font-sans transition-all resize-none shadow-inner"
+          ></textarea>
+        </div>
+
+        <!-- Action Buttons & Suggestion Chips -->
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span class="text-xs text-gray-500 mr-1">Quick Directives:</span>
+            <button @click="goalInput = 'Search emails for invoice and parse attachment details'" class="text-xs px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 transition">📬 Email Invoice Search</button>
+            <button @click="goalInput = 'Summarize SOC2 security standards and provide grounded citations'" class="text-xs px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 transition">🔍 Knowledge Base RAG</button>
+            <button @click="goalInput = 'Parse uploaded document into structured markdown tables'" class="text-xs px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 transition">📄 Docling Table Extract</button>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <button @click="generatePlanOnly()" :disabled="executing || !goalInput.trim()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 disabled:opacity-50 transition flex items-center space-x-2">
+              <i class="fa-solid fa-diagram-project"></i>
+              <span>Preview Plan</span>
+            </button>
+            <button @click="executeCurrentGoal()" :disabled="executing || !goalInput.trim()" class="px-5 py-2 text-xs font-semibold rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black shadow-lg shadow-cyan-500/20 disabled:opacity-50 transition flex items-center space-x-2 font-mono">
+              <i class="fa-solid" :class="executing ? 'fa-circle-notch fa-spin' : 'fa-play'"></i>
+              <span x-text="executing ? 'Executing...' : 'Run Agent'"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Execution DAG & Live Progress -->
+      <template x-if="activePlan && activePlan.steps">
+        <div class="bg-surface-card border border-gray-800 rounded-xl p-5 shadow-xl space-y-4">
+          <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400"></span>
+              <h3 class="text-sm font-semibold text-gray-200">Execution Plan & Dynamic Task DAG</h3>
+            </div>
+            <span class="text-xs font-mono text-gray-400" x-text="`${activePlan.steps.length} Steps Orchestrated`"></span>
+          </div>
+
+          <!-- Steps Timeline Cards -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <template x-for="step in activePlan.steps" :key="step.step_id">
+              <div class="border rounded-lg p-3.5 relative overflow-hidden transition-all"
+                :class="{
+                  'border-emerald-700/60 bg-emerald-950/20': step.status === 'completed',
+                  'border-rose-700/60 bg-rose-950/20': step.status === 'failed',
+                  'border-cyan-500/80 bg-cyan-950/30 ring-1 ring-cyan-500/40': step.status === 'in_progress',
+                  'border-gray-800 bg-gray-900/60': step.status === 'pending'
+                }">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-xs font-mono font-bold" :class="step.status === 'completed' ? 'text-emerald-400' : 'text-cyan-400'" x-text="`Step 0${step.step_id}`"></span>
+                  <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded"
+                    :class="{
+                      'bg-emerald-900/60 text-emerald-300': step.status === 'completed',
+                      'bg-rose-900/60 text-rose-300': step.status === 'failed',
+                      'bg-cyan-900/60 text-cyan-300 animate-pulse': step.status === 'in_progress',
+                      'bg-gray-800 text-gray-400': step.status === 'pending'
+                    }" x-text="step.status"></span>
+                </div>
+                <p class="text-xs font-medium text-gray-200 line-clamp-2" x-text="step.description"></p>
+                <div class="mt-2.5 pt-2 border-t border-gray-800/80 flex items-center justify-between text-[11px] font-mono text-gray-400">
+                  <span class="text-yellow-400" x-text="step.assigned_agent"></span>
+                  <span class="text-gray-500" x-text="step.input_data.instruction || 'execute'"></span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <!-- Grounded Synthesis Result Panel -->
+      <template x-if="executionResult">
+        <div class="bg-surface-card border border-cyan-800/50 rounded-xl p-6 shadow-2xl shadow-cyan-950/30 space-y-4">
+          <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-check-circle text-emerald-400"></i>
+              <h3 class="text-sm font-semibold text-gray-200">Grounded Executive Synthesis</h3>
+            </div>
+            <button @click="copySynthesis()" class="text-xs text-gray-400 hover:text-cyan-400 transition flex items-center space-x-1">
+              <i class="fa-regular fa-copy"></i>
+              <span>Copy</span>
+            </button>
+          </div>
+
+          <div class="prose-dark text-sm leading-relaxed" x-html="renderMarkdown(executionResult.final_output)"></div>
+
+          <!-- Citation Grounding Drawer -->
+          <template x-if="executionResult.citations && executionResult.citations.length > 0">
+            <div class="mt-4 pt-4 border-t border-gray-800">
+              <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2 flex items-center space-x-1.5">
+                <i class="fa-solid fa-quote-right text-cyan-400"></i>
+                <span>Referenced Evidence & Vault Citations</span>
+              </h4>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <template x-for="cit in executionResult.citations" :key="cit.citation_id">
+                  <div @click="openCitationModal(cit)" class="p-2.5 rounded-lg bg-gray-900/80 border border-gray-800 hover:border-cyan-500/50 cursor-pointer transition group">
+                    <div class="flex items-center justify-between text-xs font-mono mb-1">
+                      <span class="text-cyan-400 font-bold" x-text="cit.citation_id"></span>
+                      <span class="text-gray-400 group-hover:text-gray-200 truncate max-w-[150px]" x-text="cit.filename"></span>
+                    </div>
+                    <p class="text-xs text-gray-300 line-clamp-2" x-text="cit.snippet"></p>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
+
+    <!-- ==================== TAB 2: DOCUMENT VAULT ==================== -->
+    <div x-show="activeTab === 'vault'" class="space-y-6" x-transition>
+      <!-- Upload Dropzone -->
+      <div class="bg-surface-card border-2 border-dashed border-gray-700 hover:border-cyan-500 rounded-xl p-8 text-center transition cursor-pointer"
+        @dragover.prevent="" @drop.prevent="handleFileDrop($event)">
+        <input type="file" id="fileUploadInput" class="hidden" @change="uploadSelectedFile($event)" accept=".pdf,.docx,.txt,.md,.json">
+        <label for="fileUploadInput" class="cursor-pointer space-y-3 block">
+          <div class="w-12 h-12 rounded-full bg-cyan-950/60 border border-cyan-800 flex items-center justify-center mx-auto text-cyan-400">
+            <i class="fa-solid fa-cloud-arrow-up text-lg"></i>
+          </div>
+          <div>
+            <h4 class="text-sm font-semibold text-gray-200">Upload Original Document to Vault</h4>
+            <p class="text-xs text-gray-400 mt-1">PDF, DOCX, TXT, MD — Automatically converted with Docling & indexed into RAG</p>
+          </div>
+        </label>
+      </div>
+
+      <!-- Vault Catalog Grid -->
+      <div class="bg-surface-card border border-gray-800 rounded-xl p-5 shadow-xl space-y-4">
+        <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+          <h3 class="text-sm font-semibold text-gray-200">Preserved Original Documents in Vault</h3>
+          <button @click="fetchVaultDocuments()" class="text-xs text-gray-400 hover:text-cyan-400"><i class="fa-solid fa-rotate-right mr-1"></i> Refresh</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <template x-for="doc in vaultDocuments" :key="doc.doc_id">
+            <div class="border border-gray-800 rounded-lg p-4 bg-gray-900/60 hover:border-gray-700 transition flex flex-col justify-between space-y-3">
+              <div>
+                <div class="flex items-start justify-between gap-2">
+                  <div class="flex items-center space-x-2 truncate">
+                    <i class="fa-solid fa-file-pdf text-rose-400 text-sm"></i>
+                    <h4 class="text-xs font-semibold text-gray-100 truncate" x-text="doc.filename"></h4>
+                  </div>
+                  <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-800 text-gray-400" x-text="formatBytes(doc.file_size_bytes)"></span>
+                </div>
+                <p class="text-[11px] font-mono text-gray-500 mt-1 truncate" x-text="`ID: ${doc.doc_id}`"></p>
+                <div class="flex items-center space-x-2 mt-2 text-[11px] text-gray-400">
+                  <span x-text="`${doc.table_count || 0} Tables`"></span>
+                  <span>•</span>
+                  <span x-text="`${doc.chunk_count || 0} Chunks`"></span>
+                </div>
+              </div>
+
+              <div class="flex items-center space-x-2 pt-2 border-t border-gray-800">
+                <a :href="`/api/vault/${doc.doc_id}/file`" target="_blank" class="flex-1 text-center py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-medium transition">
+                  <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> View Original
+                </a>
+                <button @click="inspectParsedDoc(doc.doc_id)" class="flex-1 text-center py-1 rounded bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800 text-xs font-medium transition">
+                  <i class="fa-solid fa-code mr-1"></i> Parsed Markdown
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 3: COGNITIVE MEMORY ==================== -->
+    <div x-show="activeTab === 'memory'" class="space-y-6" x-transition>
+      <div class="bg-surface-card border border-gray-800 rounded-xl p-5 shadow-xl space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-3">
+          <div>
+            <h3 class="text-sm font-semibold text-gray-200">Cognitive Memory Inspector (Hindsight + MemPalace)</h3>
+            <p class="text-xs text-gray-400 mt-0.5">4 Structured Networks: Facts, Experiences, Entities, and Evolving Beliefs</p>
+          </div>
+          <div class="relative w-64">
+            <input type="text" x-model="memorySearchQuery" @input.debounce.300ms="searchMemory()" placeholder="Search memory (FTS5 BM25)..."
+              class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-cyan-500">
+          </div>
+        </div>
+
+        <!-- Spatial Loci Context Banner -->
+        <div class="p-3.5 rounded-lg bg-gray-950/80 border border-gray-800 font-mono text-xs text-cyan-300 leading-relaxed overflow-x-auto">
+          <div class="text-gray-500 text-[10px] uppercase font-bold mb-1">Spatial Loci Index (< 150 tokens)</div>
+          <div x-text="memoryData.spatial_summary || 'No memory loci loaded.'"></div>
+        </div>
+
+        <!-- Active Beliefs Table -->
+        <div class="space-y-2">
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-400">Active User Beliefs & Preferences</h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left text-gray-300 border border-gray-800 rounded-lg">
+              <thead class="bg-gray-900 text-gray-400 uppercase text-[10px] font-mono border-b border-gray-800">
+                <tr>
+                  <th class="px-4 py-2">Locus</th>
+                  <th class="px-4 py-2">Rule Key</th>
+                  <th class="px-4 py-2">Behavioral Rule / Fact</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-800">
+                <template x-for="b in (memorySearchResults.length ? memorySearchResults : memoryData.active_beliefs)" :key="b.id">
+                  <tr class="hover:bg-gray-900/50">
+                    <td class="px-4 py-2.5 font-mono text-yellow-400" x-text="`${b.wing}/${b.hall}`"></td>
+                    <td class="px-4 py-2.5 font-mono text-cyan-400" x-text="b.key"></td>
+                    <td class="px-4 py-2.5 text-gray-200" x-text="b.content"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 4: MAIL SPECIALIST ==================== -->
+    <div x-show="activeTab === 'mail'" class="space-y-6" x-transition>
+      <div class="bg-surface-card border border-gray-800 rounded-xl p-5 shadow-xl space-y-4">
+        <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+          <div>
+            <h3 class="text-sm font-semibold text-gray-200">Autonomous Email Dispatch & Inbox Triage</h3>
+            <p class="text-xs text-gray-400 mt-0.5">Policy Status: <span class="font-mono text-cyan-400 font-bold" x-text="status.autonomy_level"></span></p>
+          </div>
+          <button @click="fetchMailInbox()" class="text-xs text-gray-400 hover:text-cyan-400"><i class="fa-solid fa-rotate-right mr-1"></i> Fetch Inbox</button>
+        </div>
+
+        <div class="space-y-3">
+          <template x-for="mail in inboxEmails" :key="mail.uid || mail.subject">
+            <div class="p-3.5 rounded-lg bg-gray-900/60 border border-gray-800 hover:border-gray-700 transition space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-semibold text-gray-200" x-text="mail.sender"></span>
+                <span class="text-gray-500 font-mono text-[11px]" x-text="mail.date || 'Recent'"></span>
+              </div>
+              <h4 class="text-xs font-medium text-cyan-300" x-text="mail.subject"></h4>
+              <p class="text-xs text-gray-400 line-clamp-2" x-text="mail.snippet || mail.body"></p>
+            </div>
+          </template>
+          <template x-if="inboxEmails.length === 0">
+            <p class="text-xs text-gray-500 text-center py-6">No emails in inbox or IMAP credentials unconfigured.</p>
+          </template>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Modal for Document Parsed Preview -->
+  <div x-show="previewModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" style="display: none;" x-transition>
+    <div class="bg-surface-card border border-gray-700 rounded-xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden" @click.away="previewModalOpen = false">
+      <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-gray-100" x-text="previewModalTitle"></h3>
+        <button @click="previewModalOpen = false" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="p-6 overflow-y-auto prose-dark text-xs leading-relaxed" x-html="renderMarkdown(previewModalContent)"></div>
+    </div>
+  </div>
+
+  <script>
+    function workosApp() {
+      return {
+        activeTab: 'console',
+        goalInput: '',
+        executing: false,
+        activePlan: null,
+        executionResult: null,
+        status: {
+          version: '1.0.0',
+          model_name: 'hf.co/unsloth/SmolLM3-3B-GGUF:UD-Q6_K_XL',
+          ollama_online: true,
+          available_models: [],
+          autonomy_level: 'SUPERVISED',
+          documents_count: 0
+        },
+        vaultDocuments: [],
+        memoryData: { spatial_summary: '', active_beliefs: [] },
+        memorySearchQuery: '',
+        memorySearchResults: [],
+        inboxEmails: [],
+        previewModalOpen: false,
+        previewModalTitle: '',
+        previewModalContent: '',
+
+        init() {
+          this.fetchStatus();
+          this.fetchVaultDocuments();
+          this.fetchMemoryData();
+        },
+
+        async fetchStatus() {
+          try {
+            const res = await fetch('/api/status');
+            this.status = await res.json();
+          } catch (e) {
+            console.error('Error fetching status:', e);
+          }
+        },
+
+        async switchModel(newModel) {
+          try {
+            await fetch('/api/model', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model_name: newModel })
+            });
+            this.fetchStatus();
+          } catch (e) {
+            console.error('Error switching model:', e);
+          }
+        },
+
+        async togglePolicy() {
+          const next = this.status.autonomy_level === 'FULL' ? 'SUPERVISED' : 'FULL';
+          try {
+            await fetch('/api/policy', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ autonomy_level: next })
+            });
+            this.fetchStatus();
+          } catch (e) {
+            console.error('Error toggling policy:', e);
+          }
+        },
+
+        async generatePlanOnly() {
+          if (!this.goalInput.trim()) return;
+          try {
+            const res = await fetch('/api/plan', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ goal: this.goalInput })
+            });
+            this.activePlan = await res.json();
+          } catch (e) {
+            console.error('Error generating plan:', e);
+          }
+        },
+
+        async executeCurrentGoal() {
+          if (!this.goalInput.trim() || this.executing) return;
+          this.executing = true;
+          this.executionResult = null;
+
+          try {
+            const res = await fetch('/api/execute', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ goal: this.goalInput })
+            });
+            const data = await res.json();
+            this.activePlan = { goal: data.goal, steps: data.steps };
+            this.executionResult = data;
+            this.fetchStatus();
+            this.fetchVaultDocuments();
+          } catch (e) {
+            console.error('Execution error:', e);
+          } finally {
+            this.executing = false;
+          }
+        },
+
+        async fetchVaultDocuments() {
+          try {
+            const res = await fetch('/api/vault');
+            const data = await res.json();
+            this.vaultDocuments = data.documents || [];
+          } catch (e) {
+            console.error('Error fetching vault:', e);
+          }
+        },
+
+        async inspectParsedDoc(docId) {
+          try {
+            const res = await fetch(`/api/vault/${docId}`);
+            const data = await res.json();
+            this.previewModalTitle = `Parsed Document: ${data.filename}`;
+            this.previewModalContent = data.parsed_markdown || 'No parsed markdown available.';
+            this.previewModalOpen = true;
+          } catch (e) {
+            console.error('Error inspecting doc:', e);
+          }
+        },
+
+        openCitationModal(cit) {
+          this.previewModalTitle = `Citation Source: ${cit.filename} (${cit.citation_id})`;
+          this.previewModalContent = `### Citation Snippet:\n> ${cit.snippet}\n\n**Document ID**: \`${cit.doc_id}\`\n**Vault Location**: \`${cit.vault_path}\`\n\n[Open Full Original Document](/api/vault/${cit.doc_id}/file)`;
+          this.previewModalOpen = true;
+        },
+
+        async handleFileDrop(e) {
+          const files = e.dataTransfer.files;
+          if (files.length > 0) this.uploadFile(files[0]);
+        },
+
+        uploadSelectedFile(e) {
+          if (e.target.files.length > 0) this.uploadFile(e.target.files[0]);
+        },
+
+        async uploadFile(file) {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('parse_and_index', 'true');
+          try {
+            await fetch('/api/vault/upload', { method: 'POST', body: formData });
+            this.fetchVaultDocuments();
+            this.fetchStatus();
+          } catch (e) {
+            console.error('Upload error:', e);
+          }
+        },
+
+        async fetchMemoryData() {
+          try {
+            const res = await fetch('/api/memory');
+            this.memoryData = await res.json();
+          } catch (e) {
+            console.error('Error fetching memory:', e);
+          }
+        },
+
+        async searchMemory() {
+          if (!this.memorySearchQuery.trim()) {
+            this.memorySearchResults = [];
+            return;
+          }
+          try {
+            const res = await fetch(`/api/memory?query=${encodeURIComponent(this.memorySearchQuery)}`);
+            const data = await res.json();
+            this.memorySearchResults = data.results || [];
+          } catch (e) {
+            console.error('Memory search error:', e);
+          }
+        },
+
+        async fetchMailInbox() {
+          try {
+            const res = await fetch('/api/mail/inbox');
+            const data = await res.json();
+            this.inboxEmails = data.emails || [];
+          } catch (e) {
+            console.error('Mail fetch error:', e);
+          }
+        },
+
+        renderMarkdown(md) {
+          if (!md) return '';
+          return marked.parse(md);
+        },
+
+        copySynthesis() {
+          if (this.executionResult && this.executionResult.final_output) {
+            navigator.clipboard.writeText(this.executionResult.final_output);
+          }
+        },
+
+        formatBytes(bytes) {
+          if (!bytes) return '0 B';
+          const k = 1024;
+          const sizes = ['B', 'KB', 'MB', 'GB'];
+          const i = Math.floor(Math.log(bytes) / Math.log(k));
+          return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+      }
+    }
+  </script>
+</body>
+</html>

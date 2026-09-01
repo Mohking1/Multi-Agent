@@ -1,17 +1,17 @@
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Optional
 import time
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any
 
 
-class MemoryNetwork(str, Enum):
+class MemoryNetwork(StrEnum):
     FACTS = "facts"
     EXPERIENCES = "experiences"
     ENTITIES = "entities"
     BELIEFS = "beliefs"
 
 
-class AutonomyLevel(str, Enum):
+class AutonomyLevel(StrEnum):
     FULL = "FULL"
     SUPERVISED = "SUPERVISED"
 
@@ -26,7 +26,7 @@ class MemoryItem:
     content: str
     confidence: float = 1.0
     metadata: dict[str, Any] = field(default_factory=dict)
-    superseded_by: Optional[str] = None
+    superseded_by: str | None = None
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
 
@@ -45,7 +45,7 @@ class ExecutionResult:
     agent_name: str
     success: bool
     data: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     artifacts: list[str] = field(default_factory=list)
 
 
@@ -56,11 +56,11 @@ class PlanStep:
     assigned_agent: str
     input_data: dict[str, Any] = field(default_factory=dict)
     status: str = "pending"  # pending, in_progress, completed, failed
-    result: Optional[ExecutionResult] = None
+    result: ExecutionResult | None = None
 
 
 @dataclass
 class ExecutionPlan:
     goal: str
     steps: list[PlanStep] = field(default_factory=list)
-    final_output: Optional[str] = None
+    final_output: str | None = None

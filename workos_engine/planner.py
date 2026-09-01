@@ -1,11 +1,10 @@
 """Executive Planner & Subagent Orchestrator for WorkOS."""
-import asyncio
+
 import inspect
 import json
 import logging
-import re
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from config import WorkOSConfig, get_config
 from workos_engine.agents.base import BaseSubagent
@@ -16,7 +15,6 @@ from workos_engine.memory.networks import CognitiveMemoryEngine
 from workos_engine.types import (
     ExecutionPlan,
     ExecutionResult,
-    MemoryNetwork,
     PlanStep,
     SubagentTask,
 )
@@ -27,7 +25,7 @@ logger = logging.getLogger(__name__)
 def _lookup_variable(
     var_ref: str,
     completed_steps: dict[int, PlanStep],
-    prev_step: Optional[PlanStep],
+    prev_step: PlanStep | None,
 ) -> Any:
     """Resolves a variable reference string (e.g. '$step_1.saved_path' or '$prev.total')."""
     if not isinstance(var_ref, str) or not var_ref.startswith("$"):
@@ -35,7 +33,7 @@ def _lookup_variable(
 
     token = var_ref[1:]  # strip leading $
     parts = token.split(".")
-    target_step: Optional[PlanStep] = None
+    target_step: PlanStep | None = None
 
     if parts[0].startswith("step_"):
         try:
@@ -88,7 +86,7 @@ def _lookup_variable(
 def _resolve_variables_in_dict(
     data: dict[str, Any],
     completed_steps: dict[int, PlanStep],
-    prev_step: Optional[PlanStep],
+    prev_step: PlanStep | None,
 ) -> dict[str, Any]:
     """Recursively resolves $step_X variables inside an input_data dictionary."""
     resolved: dict[str, Any] = {}
@@ -119,12 +117,12 @@ class ExecutivePlanner:
 
     def __init__(
         self,
-        config: Optional[WorkOSConfig] = None,
-        memory: Optional[CognitiveMemoryEngine] = None,
-        mail_agent: Optional[MailAgent] = None,
-        doc_agent: Optional[DocAgent] = None,
-        rag_agent: Optional[RAGAgent] = None,
-        client: Optional[Any] = None,
+        config: WorkOSConfig | None = None,
+        memory: CognitiveMemoryEngine | None = None,
+        mail_agent: MailAgent | None = None,
+        doc_agent: DocAgent | None = None,
+        rag_agent: RAGAgent | None = None,
+        client: Any | None = None,
     ):
         self.config = config or get_config()
         self.memory = memory or CognitiveMemoryEngine(config=self.config)
@@ -173,7 +171,9 @@ class ExecutivePlanner:
         try:
             active_beliefs = self.memory.get_active_beliefs()
             if active_beliefs:
-                belief_lines = [f"- [{b.wing}/{b.hall}] {b.key}: {b.content}" for b in active_beliefs]
+                belief_lines = [
+                    f"- [{b.wing}/{b.hall}] {b.key}: {b.content}" for b in active_beliefs
+                ]
                 parts.append("User Beliefs & System Preferences:\n" + "\n".join(belief_lines))
         except Exception as e:
             logger.debug(f"Error getting active beliefs: {e}")
@@ -182,7 +182,10 @@ class ExecutivePlanner:
         try:
             recalled = self.memory.recall(query=goal, limit=5)
             if recalled:
-                fact_lines = [f"- [{m.network.value}:{m.wing}/{m.hall}] {m.key}: {m.content}" for m in recalled]
+                fact_lines = [
+                    f"- [{m.network.value}:{m.wing}/{m.hall}] {m.key}: {m.content}"
+                    for m in recalled
+                ]
                 parts.append("Relevant Recalled Knowledge:\n" + "\n".join(fact_lines))
         except Exception as e:
             logger.debug(f"Error recalling facts for goal: {e}")
@@ -200,7 +203,7 @@ class ExecutivePlanner:
                 registry[agent_name] = []
         return registry
 
-    def _generate_plan(self, goal: str, context: Optional[str] = None) -> ExecutionPlan:
+    def _generate_plan(self, goal: str, context: str | None = None) -> ExecutionPlan:
         """
         Internal implementation of dynamic multi-step ExecutionPlan construction.
         """
@@ -232,11 +235,13 @@ class ExecutivePlanner:
                 if response_text:
                     return self._parse_plan_json(response_text, fallback_goal=goal)
             except Exception as e:
-                logger.warning(f"Ollama plan generation failed: {e}. Falling back to heuristic planner.")
+                logger.warning(
+                    f"Ollama plan generation failed: {e}. Falling back to heuristic planner."
+                )
 
         return self._heuristic_plan_fallback(goal)
 
-    def generate_plan(self, goal: str, context: Optional[str] = None) -> ExecutionPlan:
+    def generate_plan(self, goal: str, context: str | None = None) -> ExecutionPlan:
         """
         Public method to generate a structured execution plan. Delegates to _generate_plan.
         """
@@ -281,9 +286,16 @@ class ExecutivePlanner:
         steps = []
         step_id = 1
 
-        is_email_search = any(w in goal_lower for w in ["email", "mail", "inbox", "sender", "arvind", "find invoice"])
-        is_doc_parse = any(w in goal_lower for w in ["pdf", "invoice", "doc", "document", "parse", "table", "chunk"])
-        is_rag_or_search = any(w in goal_lower for w in ["rag", "index", "knowledge", "hybrid", "search knowledge"])
+        is_email_search = any(
+            w in goal_lower for w in ["email", "mail", "inbox", "sender", "arvind", "find invoice"]
+        )
+        is_doc_parse = any(
+            w in goal_lower
+            for w in ["pdf", "invoice", "doc", "document", "parse", "table", "chunk"]
+        )
+        is_rag_or_search = any(
+            w in goal_lower for w in ["rag", "index", "knowledge", "hybrid", "search knowledge"]
+        )
 
         if is_email_search and is_doc_parse:
             steps.append(
@@ -300,7 +312,10 @@ class ExecutivePlanner:
                     step_id=step_id,
                     description="Parse downloaded document",
                     assigned_agent="doc_agent",
-                    input_data={"instruction": "parse_document", "file_path": "$step_1.saved_path"},
+                    input_data={
+                        "instruction": "parse_document",
+                        "file_path": "$step_1.saved_path",
+                    },
                 )
             )
             step_id += 1
@@ -310,7 +325,10 @@ class ExecutivePlanner:
                         step_id=step_id,
                         description="Index parsed content into RAG knowledge base",
                         assigned_agent="rag_agent",
-                        input_data={"instruction": "rag_ingest_pdf", "file_path": "$step_1.saved_path"},
+                        input_data={
+                            "instruction": "rag_ingest_pdf",
+                            "file_path": "$step_1.saved_path",
+                        },
                     )
                 )
         elif is_email_search:
@@ -321,7 +339,11 @@ class ExecutivePlanner:
                         step_id=step_id,
                         description=f"Execute email {instruction}",
                         assigned_agent="mail_agent",
-                        input_data={"instruction": instruction, "subject": goal, "body": goal},
+                        input_data={
+                            "instruction": instruction,
+                            "subject": goal,
+                            "body": goal,
+                        },
                     )
                 )
             else:
@@ -361,13 +383,15 @@ class ExecutivePlanner:
         and updating step results.
         """
         completed_steps: dict[int, PlanStep] = {}
-        prev_step: Optional[PlanStep] = None
+        prev_step: PlanStep | None = None
 
         for step in plan.steps:
             step.status = "in_progress"
 
             # 1. Resolve variable references
-            resolved_inputs = _resolve_variables_in_dict(step.input_data, completed_steps, prev_step)
+            resolved_inputs = _resolve_variables_in_dict(
+                step.input_data, completed_steps, prev_step
+            )
             step.input_data = resolved_inputs
 
             # 2. Check assigned agent
@@ -425,7 +449,9 @@ class ExecutivePlanner:
         """
         step_summaries = []
         for s in plan.steps:
-            status_str = f"Step {s.step_id} ({s.assigned_agent}): {s.description} -> [{s.status.upper()}]"
+            status_str = (
+                f"Step {s.step_id} ({s.assigned_agent}): {s.description} -> [{s.status.upper()}]"
+            )
             if s.result:
                 if s.result.success:
                     status_str += f"\nData: {s.result.data}"
@@ -459,10 +485,14 @@ class ExecutivePlanner:
 
         # Deterministic fallback summary
         all_ok = all(s.status == "completed" for s in plan.steps)
-        lines = [f"Execution {'completed successfully' if all_ok else 'finished with issues'} for goal: {plan.goal}\n"]
+        lines = [
+            f"Execution {'completed successfully' if all_ok else 'finished with issues'} for goal: {plan.goal}\n"
+        ]
         for s in plan.steps:
             if s.result and s.result.success:
-                lines.append(f"- Step {s.step_id} ({s.assigned_agent}): {s.description} -> {s.result.data}")
+                lines.append(
+                    f"- Step {s.step_id} ({s.assigned_agent}): {s.description} -> {s.result.data}"
+                )
             elif s.result:
                 lines.append(f"- Step {s.step_id} ({s.assigned_agent}) FAILED: {s.result.error}")
             else:

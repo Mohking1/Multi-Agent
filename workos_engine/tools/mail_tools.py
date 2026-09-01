@@ -1,18 +1,20 @@
 """IMAP, SMTP, and Email Organization ToolKit for WorkOS."""
+
 import os
 import smtplib
-from datetime import datetime, date
+from datetime import date, datetime
 from email.message import EmailMessage
-from typing import Any, Optional
+from typing import Any
 
-from imap_tools import MailBox, AND
+from imap_tools import AND, MailBox
+
 from config import WorkOSConfig, get_config
 
 
 class MailToolKit:
     """ToolKit providing IMAP searching/fetching/moving and SMTP sending/drafting operations."""
 
-    def __init__(self, config: Optional[WorkOSConfig] = None):
+    def __init__(self, config: WorkOSConfig | None = None):
         self.config = config or get_config()
 
     def _get_mailbox(self, folder: str = "INBOX") -> MailBox:
@@ -20,22 +22,18 @@ class MailToolKit:
         if not self.config.imap_host:
             raise ValueError("IMAP host is not configured.")
         mb = MailBox(self.config.imap_host, port=self.config.imap_port)
-        return mb.login(
-            self.config.imap_user,
-            self.config.imap_password,
-            initial_folder=folder
-        )
+        return mb.login(self.config.imap_user, self.config.imap_password, initial_folder=folder)
 
     def search_emails(
         self,
-        sender: Optional[str] = None,
-        subject: Optional[str] = None,
-        date_gte: Optional[Any] = None,
-        date_lt: Optional[Any] = None,
-        seen: Optional[bool] = None,
+        sender: str | None = None,
+        subject: str | None = None,
+        date_gte: Any | None = None,
+        date_lt: Any | None = None,
+        seen: bool | None = None,
         folder: str = "INBOX",
         limit: int = 20,
-        text: Optional[str] = None,
+        text: str | None = None,
     ) -> list[dict[str, Any]]:
         """Search emails in the specified IMAP folder matching filter criteria."""
         criteria: dict[str, Any] = {}
@@ -61,31 +59,35 @@ class MailToolKit:
                 flags = list(getattr(msg, "flags", ()) or ())
                 is_seen = "\\Seen" in flags or "SEEN" in flags
                 attachments = getattr(msg, "attachments", []) or []
-                body_snippet = (
-                    getattr(msg, "text", "") or getattr(msg, "html", "") or ""
-                ).strip()[:200]
+                body_snippet = (getattr(msg, "text", "") or getattr(msg, "html", "") or "").strip()[
+                    :200
+                ]
 
                 msg_date = getattr(msg, "date", None)
                 date_str = (
                     msg_date.isoformat()
                     if isinstance(msg_date, (datetime, date))
-                    else str(msg_date) if msg_date else None
+                    else str(msg_date)
+                    if msg_date
+                    else None
                 )
 
-                results.append({
-                    "uid": getattr(msg, "uid", ""),
-                    "subject": getattr(msg, "subject", "") or "",
-                    "from": getattr(msg, "from_", "") or "",
-                    "to": list(getattr(msg, "to", ()) or ()),
-                    "cc": list(getattr(msg, "cc", ()) or ()),
-                    "bcc": list(getattr(msg, "bcc", ()) or ()),
-                    "date": date_str,
-                    "flags": flags,
-                    "seen": is_seen,
-                    "size": getattr(msg, "size", 0),
-                    "has_attachments": len(attachments) > 0,
-                    "snippet": body_snippet,
-                })
+                results.append(
+                    {
+                        "uid": getattr(msg, "uid", ""),
+                        "subject": getattr(msg, "subject", "") or "",
+                        "from": getattr(msg, "from_", "") or "",
+                        "to": list(getattr(msg, "to", ()) or ()),
+                        "cc": list(getattr(msg, "cc", ()) or ()),
+                        "bcc": list(getattr(msg, "bcc", ()) or ()),
+                        "date": date_str,
+                        "flags": flags,
+                        "seen": is_seen,
+                        "size": getattr(msg, "size", 0),
+                        "has_attachments": len(attachments) > 0,
+                        "snippet": body_snippet,
+                    }
+                )
         return results
 
     def fetch_email(
@@ -101,17 +103,21 @@ class MailToolKit:
             attachments_info = []
             for att in getattr(msg, "attachments", []) or []:
                 payload = getattr(att, "payload", b"")
-                attachments_info.append({
-                    "filename": getattr(att, "filename", "unnamed"),
-                    "content_type": getattr(att, "content_type", "application/octet-stream"),
-                    "size": getattr(att, "size", len(payload) if payload else 0),
-                })
+                attachments_info.append(
+                    {
+                        "filename": getattr(att, "filename", "unnamed"),
+                        "content_type": getattr(att, "content_type", "application/octet-stream"),
+                        "size": getattr(att, "size", len(payload) if payload else 0),
+                    }
+                )
 
             msg_date = getattr(msg, "date", None)
             date_str = (
                 msg_date.isoformat()
                 if isinstance(msg_date, (datetime, date))
-                else str(msg_date) if msg_date else None
+                else str(msg_date)
+                if msg_date
+                else None
             )
 
             return {
@@ -166,8 +172,8 @@ class MailToolKit:
         to_email: str | list[str],
         subject: str,
         body: str,
-        cc: Optional[list[str]] = None,
-        bcc: Optional[list[str]] = None,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
         folder: str = "Drafts",
     ) -> dict[str, Any]:
         """Create and stage an email draft, optionally syncing to IMAP Drafts folder."""
@@ -207,10 +213,10 @@ class MailToolKit:
         to_email: str | list[str],
         subject: str,
         body: str,
-        cc: Optional[list[str]] = None,
-        bcc: Optional[list[str]] = None,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
         html: bool = False,
-        attachments: Optional[list[str]] = None,
+        attachments: list[str] | None = None,
     ) -> dict[str, Any]:
         """Send an email immediately via SMTP."""
         msg = EmailMessage()
@@ -284,8 +290,8 @@ class MailToolKit:
     def mark_email(
         self,
         uid: str,
-        seen: Optional[bool] = None,
-        flagged: Optional[bool] = None,
+        seen: bool | None = None,
+        flagged: bool | None = None,
         folder: str = "INBOX",
     ) -> dict[str, Any]:
         """Update flags on an email (read/seen status, starred/flagged)."""
@@ -302,9 +308,7 @@ class MailToolKit:
             "folder": folder,
         }
 
-    def organize_emails(
-        self, rules: list[dict[str, Any]], folder: str = "INBOX"
-    ) -> dict[str, Any]:
+    def organize_emails(self, rules: list[dict[str, Any]], folder: str = "INBOX") -> dict[str, Any]:
         """Iterate over emails and apply matching categorization and movement rules."""
         processed = 0
         actions_taken = []
@@ -342,33 +346,41 @@ class MailToolKit:
                         if action == "move":
                             dest = rule.get("destination", "Archive")
                             mailbox.move(uid, dest)
-                            actions_taken.append({
-                                "uid": uid,
-                                "action": "move",
-                                "destination": dest,
-                                "subject": subject,
-                            })
+                            actions_taken.append(
+                                {
+                                    "uid": uid,
+                                    "action": "move",
+                                    "destination": dest,
+                                    "subject": subject,
+                                }
+                            )
                         elif action == "mark_seen":
                             mailbox.flag(uid, ["\\Seen"], True)
-                            actions_taken.append({
-                                "uid": uid,
-                                "action": "mark_seen",
-                                "subject": subject,
-                            })
+                            actions_taken.append(
+                                {
+                                    "uid": uid,
+                                    "action": "mark_seen",
+                                    "subject": subject,
+                                }
+                            )
                         elif action == "mark_unseen":
                             mailbox.flag(uid, ["\\Seen"], False)
-                            actions_taken.append({
-                                "uid": uid,
-                                "action": "mark_unseen",
-                                "subject": subject,
-                            })
+                            actions_taken.append(
+                                {
+                                    "uid": uid,
+                                    "action": "mark_unseen",
+                                    "subject": subject,
+                                }
+                            )
                         elif action == "mark_flagged":
                             mailbox.flag(uid, ["\\Flagged"], True)
-                            actions_taken.append({
-                                "uid": uid,
-                                "action": "mark_flagged",
-                                "subject": subject,
-                            })
+                            actions_taken.append(
+                                {
+                                    "uid": uid,
+                                    "action": "mark_flagged",
+                                    "subject": subject,
+                                }
+                            )
                         break  # Apply first matching rule per email
 
         return {

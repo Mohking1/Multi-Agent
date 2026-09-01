@@ -1,7 +1,8 @@
 """Native Ollama Client for WorkOS."""
-import json
+
 import logging
-from typing import Any, Optional
+from typing import Any
+
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -28,9 +29,9 @@ class OllamaClient:
     def generate(
         self,
         prompt: str,
-        model: Optional[str] = None,
-        system: Optional[str] = None,
-        format: Optional[str] = None,
+        model: str | None = None,
+        system: str | None = None,
+        format: str | None = None,
         temperature: float = 0.1,
     ) -> str:
         """
@@ -61,9 +62,9 @@ class OllamaClient:
     async def generate_async(
         self,
         prompt: str,
-        model: Optional[str] = None,
-        system: Optional[str] = None,
-        format: Optional[str] = None,
+        model: str | None = None,
+        system: str | None = None,
+        format: str | None = None,
         temperature: float = 0.1,
     ) -> str:
         """Asynchronous generation from Ollama."""
@@ -91,8 +92,8 @@ class OllamaClient:
     def chat(
         self,
         messages: list[dict[str, str]],
-        model: Optional[str] = None,
-        format: Optional[str] = None,
+        model: str | None = None,
+        format: str | None = None,
         temperature: float = 0.1,
     ) -> str:
         """Chat completion from Ollama (/api/chat)."""
@@ -118,7 +119,7 @@ class OllamaClient:
     def embed(
         self,
         input_text: str | list[str],
-        model: Optional[str] = None,
+        model: str | None = None,
     ) -> list[list[float]]:
         """
         Generate dense vector embeddings from Ollama (/api/embed or /api/embeddings).
@@ -174,4 +175,3 @@ class OllamaClient:
                 return res.status_code == 200
         except Exception:
             return False
-
