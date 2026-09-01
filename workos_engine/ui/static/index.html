@@ -191,16 +191,27 @@
           </div>
 
           <div class="flex items-center space-x-2">
-            <button @click="generatePlanOnly()" :disabled="executing || !goalInput.trim()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-obsidian-hover hover:bg-obsidian-subtle text-gray-300 border border-obsidian-border disabled:opacity-50 transition flex items-center space-x-2">
-              <i class="fa-solid fa-diagram-project"></i>
-              <span>Preview Plan</span>
+            <button @click="generatePlanOnly()" :disabled="executing || planning || !goalInput.trim()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-obsidian-hover hover:bg-obsidian-subtle text-gray-200 border border-obsidian-border disabled:opacity-50 transition flex items-center space-x-2 cursor-pointer shadow-sm">
+              <i class="fa-solid" :class="planning ? 'fa-circle-notch fa-spin text-brand-cyan' : 'fa-diagram-project text-brand-cyan'"></i>
+              <span x-text="planning ? 'Formulating Plan...' : 'Preview Plan'"></span>
             </button>
-            <button @click="executeCurrentGoal()" :disabled="executing || !goalInput.trim()" class="px-5 py-2 text-xs font-semibold rounded-lg bg-brand-cyan hover:bg-cyan-400 text-black shadow-lg shadow-cyan-500/20 disabled:opacity-50 transition flex items-center space-x-2 font-mono">
+            <button @click="executeCurrentGoal()" :disabled="executing || planning || !goalInput.trim()" class="px-5 py-2 text-xs font-semibold rounded-lg bg-brand-cyan hover:bg-cyan-400 text-black shadow-lg shadow-cyan-500/20 disabled:opacity-50 transition flex items-center space-x-2 font-mono cursor-pointer">
               <i class="fa-solid" :class="executing ? 'fa-circle-notch fa-spin' : 'fa-play'"></i>
               <span x-text="executing ? 'Orchestrating...' : 'Execute Directive'"></span>
             </button>
           </div>
         </div>
+
+        <!-- Error Alert Banner -->
+        <template x-if="errorMessage">
+          <div class="mt-3 p-3 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-xs flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+              <span x-text="errorMessage"></span>
+            </div>
+            <button @click="errorMessage = ''" class="text-rose-400 hover:text-rose-200"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </template>
       </div>
 
       <!-- Split Canvas: Left (60% Execution & Synthesis) | Right (40% Provenance & Evidence) -->
@@ -545,7 +556,9 @@
       return {
         activeTab: 'cockpit',
         goalInput: '',
+        planning: false,
         executing: false,
+        errorMessage: '',
         activePlan: null,
         executionResult: null,
         selectedCitation: null,
@@ -625,22 +638,39 @@
         },
 
         async generatePlanOnly() {
-          if (!this.goalInput.trim()) return;
+          if (!this.goalInput.trim() || this.planning || this.executing) return;
+          this.planning = true;
+          this.errorMessage = '';
+          this.activePlan = null;
+          this.executionResult = null;
           try {
             const res = await fetch('/api/plan', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ goal: this.goalInput })
             });
-            this.activePlan = await res.json();
+            if (!res.ok) {
+              const err = await res.json();
+              throw new Error(err.detail || 'Plan formulation failed');
+            }
+            const data = await res.json();
+            if (data && data.steps) {
+              this.activePlan = data;
+            } else {
+              throw new Error('Received invalid plan structure');
+            }
           } catch (e) {
             console.error('Error generating plan:', e);
+            this.errorMessage = 'Plan Generation Error: ' + (e.message || e);
+          } finally {
+            this.planning = false;
           }
         },
 
         async executeCurrentGoal() {
-          if (!this.goalInput.trim() || this.executing) return;
+          if (!this.goalInput.trim() || this.executing || this.planning) return;
           this.executing = true;
+          this.errorMessage = '';
           this.executionResult = null;
           this.selectedCitation = null;
 
@@ -650,6 +680,10 @@
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ goal: this.goalInput })
             });
+            if (!res.ok) {
+              const err = await res.json();
+              throw new Error(err.detail || 'Execution failed');
+            }
             const data = await res.json();
             this.activePlan = { goal: data.goal, steps: data.steps };
             this.executionResult = data;
@@ -660,6 +694,7 @@
             this.fetchVaultDocuments();
           } catch (e) {
             console.error('Execution error:', e);
+            this.errorMessage = 'Execution Error: ' + (e.message || e);
           } finally {
             this.executing = false;
           }
