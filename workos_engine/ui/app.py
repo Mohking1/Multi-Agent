@@ -182,12 +182,54 @@ async def execute_goal_endpoint(req: GoalRequest):
     for step in plan.steps:
         if step.result and isinstance(step.result.data, dict):
             if "citations" in step.result.data and isinstance(step.result.data["citations"], list):
-                citations.extend(step.result.data["citations"])
+                for cit in step.result.data["citations"]:
+                    if isinstance(cit, dict) and not any(
+                        c.get("citation_id") == cit.get("citation_id") for c in citations
+                    ):
+                        citations.append(cit)
+        elif step.result and isinstance(step.result.data, list):
+            # Web search results list
+            for idx, r in enumerate(step.result.data, 1):
+                if isinstance(r, dict) and (r.get("url") or r.get("title")):
+                    cit_id = f"[{idx}]"
+                    if not any(c.get("citation_id") == cit_id for c in citations):
+                        citations.append(
+                            {
+                                "citation_id": cit_id,
+                                "title": r.get("title", f"Result {idx}"),
+                                "filename": r.get("title", f"Result {idx}"),
+                                "url": r.get("url", ""),
+                                "snippet": r.get("snippet", ""),
+                                "score": r.get("score", 1.0),
+                            }
+                        )
         if step.result and isinstance(step.result.artifacts, list):
             for art in step.result.artifacts:
                 if isinstance(art, dict) and "citation_id" in art:
                     if not any(c.get("citation_id") == art.get("citation_id") for c in citations):
                         citations.append(art)
+
+    # Also parse sources lines from final synthesis (e.g. Sources:\n[1] https://...)
+    if plan.final_output:
+        import re
+
+        for m in re.finditer(r"\[(\d+)\]\s*([^\n\r]+)", plan.final_output):
+            cit_id = f"[{m.group(1)}]"
+            if not any(c.get("citation_id") == cit_id for c in citations):
+                line_content = m.group(2).strip()
+                url_match = re.search(r"https?://[^\s\)]+", line_content)
+                url = url_match.group(0) if url_match else ""
+                title = line_content.replace(url, "").strip(" -–—:") if url else line_content
+                citations.append(
+                    {
+                        "citation_id": cit_id,
+                        "title": title or line_content,
+                        "filename": title or line_content,
+                        "url": url,
+                        "snippet": line_content,
+                        "score": 1.0,
+                    }
+                )
 
     return {
         "goal": plan.goal,

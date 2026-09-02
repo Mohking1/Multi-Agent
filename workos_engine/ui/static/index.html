@@ -344,6 +344,7 @@
           
           <!-- Selected Evidence & Citation Card -->
           <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-4">
+          <div id="citation-inspector-card" class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-4 scroll-mt-6">
             <div class="flex items-center justify-between border-b border-obsidian-border pb-3">
               <div class="flex items-center space-x-2">
                 <i class="fa-solid fa-quote-right text-brand-cyan text-xs"></i>
@@ -649,10 +650,43 @@
 
           // Global click listener for citation tags [1], [2] inside rendered Markdown
           window.handleCitationClick = (citationId) => {
+            const cleanId = String(citationId).replace(/[\[\]]/g, '').trim();
+            let match = null;
             if (this.executionResult && this.executionResult.citations) {
               const match = this.executionResult.citations.find(c => c.citation_id === citationId || c.citation_id === `[${citationId}]`);
               if (match) {
                 this.selectCitation(match);
+              match = this.executionResult.citations.find(c => {
+                const cId = String(c.citation_id || '').replace(/[\[\]]/g, '').trim();
+                return cId === cleanId;
+              });
+            }
+
+            if (!match && this.executionResult && this.executionResult.final_output) {
+              // Fallback: extract source line dynamically from synthesis text
+              const text = this.executionResult.final_output;
+              const regex = new RegExp(`\\[${cleanId}\\]\\s*([^\\n\\r]+)`, 'i');
+              const found = text.match(regex);
+              if (found) {
+                const line = found[1].trim();
+                const urlMatch = line.match(/https?:\/\/[^\s\)]+/);
+                match = {
+                  citation_id: `[${cleanId}]`,
+                  title: urlMatch ? line.replace(urlMatch[0], '').trim().replace(/^[-–—:]\s*/, '') : line,
+                  url: urlMatch ? urlMatch[0] : null,
+                  snippet: line,
+                  score: 1.0
+                };
+              }
+            }
+
+            if (match) {
+              this.selectCitation(match);
+              const card = document.getElementById('citation-inspector-card');
+              if (card) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                card.classList.add('ring-2', 'ring-brand-cyan');
+                setTimeout(() => card.classList.remove('ring-2', 'ring-brand-cyan'), 1500);
               }
             }
           };
@@ -922,6 +956,7 @@
           // 4. Interactive citation badges [1], [2], etc.
           html = html.replace(/\[(\d+)\]/g, (match, num) => {
             return `<span class="citation-tag" onclick="window.handleCitationClick('[${num}]')">[${num}]</span>`;
+            return `<button type="button" class="citation-tag inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded text-xs font-mono font-bold bg-cyan-950/60 border border-brand-cyan/50 text-brand-cyan hover:bg-brand-cyan hover:text-gray-950 transition cursor-pointer shadow-sm" onclick="window.handleCitationClick('${num}')">[${num}]</button>`;
           });
 
           return html;
