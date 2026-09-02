@@ -190,7 +190,32 @@ class BaseSubagent(ABC):
                 try:
                     obs = self.execute_tool(tool_name, args)
                     accumulated_data.append(obs)
-                    obs_snippet = str(obs)[:600]
+
+                    if (
+                        isinstance(obs, list)
+                        and obs
+                        and isinstance(obs[0], dict)
+                        and "uid" in obs[0]
+                    ):
+                        formatted_items = [
+                            f"UID {m.get('uid')}: From <{m.get('from')}> | Subj: {m.get('subject')} | Date: {m.get('date')}"
+                            for m in obs[:25]
+                        ]
+                        obs_snippet = f"Retrieved {len(obs)} emails:\n" + "\n".join(formatted_items)
+                    elif (
+                        isinstance(obs, list)
+                        and obs
+                        and isinstance(obs[0], dict)
+                        and "name" in obs[0]
+                        and "delimiter" in obs[0]
+                    ):
+                        formatted_folders = [
+                            f"- {f.get('name')} (delim: '{f.get('delimiter')}')" for f in obs
+                        ]
+                        obs_snippet = f"Folders ({len(obs)}):\n" + "\n".join(formatted_folders[:30])
+                    else:
+                        obs_snippet = str(obs)[:1200]
+
                     history.append(f"Step {iteration} Observation: {obs_snippet}")
 
                     if isinstance(obs, dict) and "saved_path" in obs:

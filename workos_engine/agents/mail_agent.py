@@ -94,8 +94,14 @@ class MailAgent(BaseSubagent):
             return self.toolkit.move_email(**args)
         elif t in ("mark_email", "mark"):
             return self.toolkit.mark_email(**args)
+        elif t in ("list_folders", "folders"):
+            return self.toolkit.list_folders()
+        elif t in ("create_folder", "new_folder", "mkdir"):
+            return self.toolkit.create_folder(**args)
         elif t in ("organize_emails", "organize", "organize_folder"):
-            return self.toolkit.organize_emails(**args)
+            clean_args = dict(args)
+            clean_args.pop("instruction", None)
+            return self.toolkit.organize_emails(**clean_args)
         else:
             raise ValueError(f"Unknown mail tool: {tool_name}")
 
@@ -103,6 +109,20 @@ class MailAgent(BaseSubagent):
         """Executes a delegated email task instruction or runs autonomous micro-ReAct loop."""
         instruction = (task.instruction or "").lower().strip()
         ctx = dict(task.context or {})
+
+        # Normalize organize instructions
+        if instruction in ("organize_emails", "organize"):
+            query_str = (str(ctx.get("query", "")) + " " + (task.instruction or "")).lower()
+            if "category" not in ctx:
+                if (
+                    "german" in query_str
+                    or "university" in query_str
+                    or "universities" in query_str
+                ):
+                    ctx["category"] = "German Universities"
+            if "date_gte" not in ctx:
+                if "may" in query_str:
+                    ctx["date_gte"] = "2026-05-01"
 
         # Direct mapped tool calls
         mapped_tools = {
@@ -122,6 +142,8 @@ class MailAgent(BaseSubagent):
             "move": "move_email",
             "mark_email": "mark_email",
             "mark": "mark_email",
+            "list_folders": "list_folders",
+            "create_folder": "create_folder",
             "organize_emails": "organize_emails",
             "organize": "organize_emails",
         }
@@ -369,21 +391,54 @@ class MailAgent(BaseSubagent):
             },
             {
                 "name": "organize_emails",
-                "description": "Automatically categorize, move, or flag emails matching specified rule criteria.",
+                "description": "Automatically categorize and move emails into folders or subfolders based on category (e.g. 'German Universities') or custom rules.",
                 "parameters": {
                     "type": "object",
                     "properties": {
+                        "category": {
+                            "type": "string",
+                            "description": "Category or parent folder name (e.g. 'German Universities').",
+                        },
+                        "date_gte": {
+                            "type": "string",
+                            "description": "Start date (YYYY-MM-DD) to organize emails from (e.g. '2026-05-01').",
+                        },
+                        "nested_subfolders": {
+                            "type": "boolean",
+                            "description": "Whether to sort into subfolders per institution/university. Defaults to true.",
+                        },
                         "rules": {
                             "type": "array",
                             "items": {"type": "object"},
-                            "description": "List of rule dictionaries containing match conditions and actions.",
+                            "description": "Optional custom rule dictionaries with match criteria and destination.",
                         },
                         "folder": {
                             "type": "string",
-                            "description": "IMAP folder name to process. Defaults to 'INBOX'.",
+                            "description": "IMAP source folder. Defaults to 'INBOX'.",
                         },
                     },
-                    "required": ["rules"],
+                },
+            },
+            {
+                "name": "list_folders",
+                "description": "List all existing IMAP folders / mailboxes and their hierarchy delimiter.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
+            {
+                "name": "create_folder",
+                "description": "Create a new IMAP folder or nested subfolder (e.g. 'German Universities' or 'German Universities/TU Dresden').",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "folder": {
+                            "type": "string",
+                            "description": "Folder or subfolder name to create. Use '/' for nested folders.",
+                        },
+                    },
+                    "required": ["folder"],
                 },
             },
         ]

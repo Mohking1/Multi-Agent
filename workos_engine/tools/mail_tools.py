@@ -29,6 +29,50 @@ class MailToolKit:
         mb = MailBox(self.config.imap_host, port=self.config.imap_port)
         return mb.login(self.config.imap_user, self.config.imap_password, initial_folder=folder)
 
+    def _parse_date(self, d: Any) -> date | None:
+        if isinstance(d, datetime):
+            return d.date()
+        if isinstance(d, date):
+            return d
+        if isinstance(d, str):
+            try:
+                return datetime.fromisoformat(d.replace("Z", "+00:00")).date()
+            except Exception:
+                try:
+                    return datetime.strptime(d[:10], "%Y-%m-%d").date()
+                except Exception:
+                    pass
+        return None
+
+    def _extract_institution(self, sender: str, subject: str) -> str | None:
+        """Helper to identify academic institution or university from sender and subject."""
+        text = f"{sender} {subject}".lower()
+        known_mappings = [
+            (r"tu-dresden\.de|dresden", "TU Dresden"),
+            (r"fau\.de|erlangen", "FAU Erlangen-Nurnberg"),
+            (r"tu-dortmund\.de|dortmund", "TU Dortmund"),
+            (r"uni-trier\.de|trier", "University of Trier"),
+            (r"b-tu\.de|cottbus", "BTU Cottbus"),
+            (r"hs-heilbronn\.de|heilbronn", "HS Heilbronn"),
+            (r"tuhh\.de|hamburg", "TU Hamburg"),
+            (r"ismll\.de|hildesheim", "Uni Hildesheim"),
+            (r"uni-assist\.de", "uni-assist"),
+            (r"daad\.de", "DAAD"),
+            (r"tum\.de|munich", "TU Munich"),
+            (r"uni-stuttgart\.de|stuttgart", "University of Stuttgart"),
+            (r"rwth-aachen\.de|aachen", "RWTH Aachen"),
+        ]
+        for pattern, name in known_mappings:
+            if re.search(pattern, text):
+                return name
+
+        # Generic domain-based extraction: user@sub.domain.de -> domain
+        match = re.search(r"@(?:[a-zA-Z0-9_-]+\.)*([a-zA-Z0-9_-]+)\.(?:de|edu)", sender.lower())
+        if match:
+            domain_name = match.group(1).capitalize()
+            return f"University_{domain_name}"
+        return None
+
     def search_emails(
         self,
         sender: str | None = None,
@@ -51,27 +95,12 @@ class MailToolKit:
         if subject:
             criteria["subject"] = _clean_ascii(subject)
 
-        def _parse_date(d: Any) -> date | None:
-            if isinstance(d, datetime):
-                return d.date()
-            if isinstance(d, date):
-                return d
-            if isinstance(d, str):
-                try:
-                    return datetime.fromisoformat(d.replace("Z", "+00:00")).date()
-                except Exception:
-                    try:
-                        return datetime.strptime(d[:10], "%Y-%m-%d").date()
-                    except Exception:
-                        pass
-            return None
-
         if date_gte:
-            parsed_gte = _parse_date(date_gte)
+            parsed_gte = self._parse_date(date_gte)
             if parsed_gte:
                 criteria["date_gte"] = parsed_gte
         if date_lt:
-            parsed_lt = _parse_date(date_lt)
+            parsed_lt = self._parse_date(date_lt)
             if parsed_lt:
                 criteria["date_lt"] = parsed_lt
         if seen is not None:
@@ -326,11 +355,47 @@ class MailToolKit:
             "message_id": msg.get("Message-ID", ""),
         }
 
+    def list_folders(self) -> list[dict[str, Any]]:
+        """List all available IMAP folders / labels and their hierarchy delimiter."""
+        with self._get_mailbox() as mailbox:
+            folder_list = []
+            for f in mailbox.folder.list():
+                folder_list.append(
+                    {
+                        "name": f.name,
+                        "delimiter": getattr(f, "delim", "/") or "/",
+                        "flags": list(getattr(f, "flags", ()) or ()),
+                    }
+                )
+            return folder_list
+
+    def create_folder(self, folder: str) -> dict[str, Any]:
+        """
+        Create a new folder or nested subfolder (e.g. 'German Universities/TU Dresden').
+        If the folder already exists, returns existing status gracefully.
+        """
+        with self._get_mailbox() as mailbox:
+            try:
+                if mailbox.folder.exists(folder):
+                    return {"status": "exists", "folder": folder}
+                mailbox.folder.create(folder)
+                return {"status": "created", "folder": folder}
+            except Exception as e:
+                err_msg = str(e).lower()
+                if "exist" in err_msg or "duplicate" in err_msg or "already" in err_msg:
+                    return {"status": "exists", "folder": folder}
+                raise
+
     def move_email(
         self, uid: str, destination_folder: str, source_folder: str = "INBOX"
     ) -> dict[str, Any]:
-        """Move an email from one folder to another."""
+        """Move an email from one folder to another, ensuring the destination folder exists."""
         with self._get_mailbox(folder=source_folder) as mailbox:
+            try:
+                if not mailbox.folder.exists(destination_folder):
+                    mailbox.folder.create(destination_folder)
+            except Exception as e:
+                logger.debug(f"Ensuring destination folder '{destination_folder}' before move: {e}")
             mailbox.move(uid, destination_folder)
         return {
             "status": "moved",
@@ -360,12 +425,115 @@ class MailToolKit:
             "folder": folder,
         }
 
-    def organize_emails(self, rules: list[dict[str, Any]], folder: str = "INBOX") -> dict[str, Any]:
-        """Iterate over emails and apply matching categorization and movement rules."""
-        processed = 0
+    def organize_emails(
+        self,
+        rules: list[dict[str, Any]] | None = None,
+        category: str | None = None,
+        date_gte: Any = None,
+        date_lt: Any = None,
+        nested_subfolders: bool = True,
+        folder: str = "INBOX",
+        limit: int = 200,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """
+        Organize emails in the mailbox.
+        Supports:
+        1. Category-based organization (e.g. category='German Universities', date_gte='2026-05-01', nested_subfolders=True)
+        2. Rule-based criteria (rules=[{"match": {...}, "action": "move", "destination": "..."}])
+        """
         actions_taken = []
+        processed = 0
+
+        # Mode A: Category / Academic Institution Organization
+        if category or not rules:
+            root_folder = category or "German Universities"
+            with self._get_mailbox(folder=folder) as mailbox:
+                criteria: dict[str, Any] = {}
+                if date_gte:
+                    parsed_gte = self._parse_date(date_gte)
+                    if parsed_gte:
+                        criteria["date_gte"] = parsed_gte
+                if date_lt:
+                    parsed_lt = self._parse_date(date_lt)
+                    if parsed_lt:
+                        criteria["date_lt"] = parsed_lt
+
+                # Fetch matching emails (prefer .de / academic tokens, fallback to date window)
+                try:
+                    messages = list(
+                        mailbox.fetch(
+                            AND(text=".de", **criteria) if criteria else AND(text=".de"),
+                            limit=limit,
+                            reverse=True,
+                            mark_seen=False,
+                        )
+                    )
+                except Exception:
+                    messages = []
+
+                if not messages:
+                    try:
+                        messages = list(
+                            mailbox.fetch(
+                                AND(**criteria) if criteria else AND(all=True),
+                                limit=limit,
+                                reverse=True,
+                                mark_seen=False,
+                            )
+                        )
+                    except Exception as e:
+                        logger.warning(f"Error fetching emails for organization: {e}")
+                        messages = []
+
+                folders_created = set()
+                for msg in messages:
+                    processed += 1
+                    sender = getattr(msg, "from_", "") or ""
+                    subject = getattr(msg, "subject", "") or ""
+                    institution = self._extract_institution(sender, subject)
+                    if not institution:
+                        continue
+
+                    dest_folder = (
+                        f"{root_folder}/{institution}" if nested_subfolders else root_folder
+                    )
+                    try:
+                        if not mailbox.folder.exists(dest_folder):
+                            mailbox.folder.create(dest_folder)
+                            folders_created.add(dest_folder)
+                    except Exception as e:
+                        logger.debug(f"Ensuring folder '{dest_folder}': {e}")
+
+                    uid = str(getattr(msg, "uid", ""))
+                    try:
+                        mailbox.move(uid, dest_folder)
+                        actions_taken.append(
+                            {
+                                "uid": uid,
+                                "action": "move",
+                                "institution": institution,
+                                "destination": dest_folder,
+                                "subject": subject,
+                                "from": sender,
+                                "date": str(getattr(msg, "date", ""))[:10],
+                            }
+                        )
+                    except Exception as err:
+                        logger.warning(f"Failed to move email {uid} to {dest_folder}: {err}")
+
+            return {
+                "status": "organized",
+                "category": root_folder,
+                "processed_count": processed,
+                "organized_count": len(actions_taken),
+                "folders_created": sorted(folders_created),
+                "actions_taken": actions_taken,
+            }
+
+        # Mode B: Explicit rule-based processing
         with self._get_mailbox(folder=folder) as mailbox:
-            messages = list(mailbox.fetch(AND(all=True), mark_seen=False))
+            messages = list(mailbox.fetch(AND(all=True), limit=limit, mark_seen=False))
             for msg in messages:
                 processed += 1
                 for rule in rules:
@@ -397,6 +565,11 @@ class MailToolKit:
 
                         if action == "move":
                             dest = rule.get("destination", "Archive")
+                            try:
+                                if not mailbox.folder.exists(dest):
+                                    mailbox.folder.create(dest)
+                            except Exception:
+                                pass
                             mailbox.move(uid, dest)
                             actions_taken.append(
                                 {
@@ -438,5 +611,6 @@ class MailToolKit:
         return {
             "status": "organized",
             "processed_count": processed,
+            "organized_count": len(actions_taken),
             "actions_taken": actions_taken,
         }

@@ -306,22 +306,21 @@ class ExecutivePlanner:
 
         system_prompt = (
             "You are the WorkOS Executive Multi-Agent Planner.\n"
-            "You NEVER execute, answer, or fulfill the user request directly.\n"
+            "You NEVER execute or answer the user request directly.\n"
             'Your ONLY role is to output a JSON object containing the "goal" and a sequential "steps" array decomposing the request across specialist agents:\n\n'
             "Specialist Agents:\n"
-            "- 'mail_agent': Searches and inspects the user's email inbox.\n"
-            "- 'web_agent': Searches the live web, online forums, news, and portals.\n"
-            "- 'doc_agent': Parses uploaded PDF/DOCX files and tables.\n"
-            "- 'rag_agent': Searches internal knowledge base chunks.\n\n"
-            "Planning Directives:\n"
-            "1. If the request asks to check emails/inbox AND search online, you MUST create TWO distinct steps:\n"
-            "   - Step 1 assigned to 'mail_agent' to search recent emails in the inbox.\n"
-            "   - Step 2 assigned to 'web_agent' to search online web sources and timelines.\n"
-            "2. Return strictly valid JSON in this exact structure:\n"
+            "- 'mail_agent': Email management, search, folder creation, moving, and organizing in the inbox.\n"
+            "- 'web_agent': Live web search, news, portals, and online timelines.\n"
+            "- 'doc_agent': Document and table parsing.\n"
+            "- 'rag_agent': Internal knowledge base search.\n\n"
+            "Directives:\n"
+            "1. If the task is internal email management or organization, use ONLY 'mail_agent'. Do NOT call 'web_agent' unless the user explicitly requested online web searching.\n"
+            "2. If the request asks to check emails AND search online, create sequential steps: Step 1 (mail_agent), Step 2 (web_agent).\n"
+            "3. Output strictly valid JSON in this exact structure:\n"
             "{\n"
             '  "goal": "<user request>",\n'
             '  "steps": [\n'
-            '    {"step_id": 1, "assigned_agent": "<agent_name>", "description": "<concise description of action>", "input_data": {"query": "<search keyword or mission parameters>"}}\n'
+            '    {"step_id": 1, "assigned_agent": "<agent_name>", "description": "<concise description of action>", "input_data": {"instruction": "<action>", "query": "<search keyword or parameters>"}}\n'
             "  ]\n"
             "}"
         )
@@ -420,21 +419,38 @@ class ExecutivePlanner:
                     str(s.get("assigned_agent") or s.get("agent") or "").strip().lower()
                 )
 
-                # Normalize agent name
-                if assigned_agent not in valid_agents:
+                # Normalize agent name based on description and assigned name
+                desc_lower = desc.lower()
+                if any(
+                    w in desc_lower
+                    for w in [
+                        "inbox",
+                        "mailbox",
+                        "folder",
+                        "subfolder",
+                        "organize email",
+                        "move email",
+                    ]
+                ):
+                    assigned_agent = "mail_agent"
+                elif assigned_agent not in valid_agents:
                     if any(w in assigned_agent for w in ["mail", "email", "inbox"]):
                         assigned_agent = "mail_agent"
                     elif any(w in assigned_agent for w in ["doc", "parse", "pdf", "table"]):
                         assigned_agent = "doc_agent"
-                    elif any(
-                        w in assigned_agent
-                        for w in ["web", "search", "internet", "google", "fetch"]
-                    ):
-                        assigned_agent = "web_agent"
                     elif any(w in assigned_agent for w in ["rag", "knowledge", "index", "vector"]):
                         assigned_agent = "rag_agent"
+                    elif any(
+                        w in assigned_agent
+                        for w in ["web", "online", "internet", "google", "browse"]
+                    ):
+                        assigned_agent = "web_agent"
                     else:
-                        assigned_agent = "web_agent" if "web" in desc.lower() else "rag_agent"
+                        assigned_agent = (
+                            "web_agent"
+                            if ("web" in desc_lower or "online" in desc_lower)
+                            else "mail_agent"
+                        )
 
                 input_data = s.get("input_data") or s.get("params") or s.get("args") or {}
                 if isinstance(input_data, str):
@@ -548,6 +564,21 @@ class ExecutivePlanner:
                             status_str += "\nObserved Details:\n" + "\n".join(
                                 f"  - {st}" for st in steps_log
                             )
+                        if "organized_count" in s.result.data:
+                            count = s.result.data.get("organized_count", 0)
+                            folders = s.result.data.get("folders_created", [])
+                            cat = s.result.data.get("category", "")
+                            status_str += (
+                                f"\nOrganization Result: Organized {count} emails into '{cat}'."
+                            )
+                            if folders:
+                                status_str += f"\nSubfolders Created/Used: {', '.join(folders)}"
+                            actions = s.result.data.get("actions_taken", [])
+                            if actions:
+                                status_str += "\nSample Organized Emails:\n" + "\n".join(
+                                    f"  - [{a.get('institution')}] {a.get('from')}: {a.get('subject')} -> {a.get('destination')}"
+                                    for a in actions[:15]
+                                )
                     else:
                         status_str += f"\nData: {str(s.result.data)[:1000]}"
 
