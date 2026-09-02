@@ -321,8 +321,7 @@ class ExecutivePlanner:
             "{\n"
             '  "goal": "<user request>",\n'
             '  "steps": [\n'
-            '    {"step_id": 1, "assigned_agent": "mail_agent", "description": "Search inbox for emails regarding Dresden, FAU, or Dortmund", "input_data": {"query": "Dresden FAU Dortmund"}},\n'
-            '    {"step_id": 2, "assigned_agent": "web_agent", "description": "Search online for expected admission release dates and timelines", "input_data": {"query": "TU Dresden FAU Erlangen Dortmund admission results timeline"}}\n'
+            '    {"step_id": 1, "assigned_agent": "<agent_name>", "description": "<concise description of action>", "input_data": {"query": "<search keyword or mission parameters>"}}\n'
             "  ]\n"
             "}"
         )
