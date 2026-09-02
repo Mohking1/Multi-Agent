@@ -44,33 +44,21 @@ class MailToolKit:
                     pass
         return None
 
-    def _extract_institution(self, sender: str, subject: str) -> str | None:
-        """Helper to identify academic institution or university from sender and subject."""
-        text = f"{sender} {subject}".lower()
-        known_mappings = [
-            (r"tu-dresden\.de|dresden", "TU Dresden"),
-            (r"fau\.de|erlangen", "FAU Erlangen-Nurnberg"),
-            (r"tu-dortmund\.de|dortmund", "TU Dortmund"),
-            (r"uni-trier\.de|trier", "University of Trier"),
-            (r"b-tu\.de|cottbus", "BTU Cottbus"),
-            (r"hs-heilbronn\.de|heilbronn", "HS Heilbronn"),
-            (r"tuhh\.de|hamburg", "TU Hamburg"),
-            (r"ismll\.de|hildesheim", "Uni Hildesheim"),
-            (r"uni-assist\.de", "uni-assist"),
-            (r"daad\.de", "DAAD"),
-            (r"tum\.de|munich", "TU Munich"),
-            (r"uni-stuttgart\.de|stuttgart", "University of Stuttgart"),
-            (r"rwth-aachen\.de|aachen", "RWTH Aachen"),
-        ]
-        for pattern, name in known_mappings:
-            if re.search(pattern, text):
-                return name
-
-        # Generic domain-based extraction: user@sub.domain.de -> domain
-        match = re.search(r"@(?:[a-zA-Z0-9_-]+\.)*([a-zA-Z0-9_-]+)\.(?:de|edu)", sender.lower())
-        if match:
-            domain_name = match.group(1).capitalize()
-            return f"University_{domain_name}"
+    def _extract_domain_label(self, sender: str) -> str | None:
+        """Extract a clean, human-readable organization or domain label from an email address generically."""
+        if not sender or "@" not in sender:
+            return None
+        domain_part = sender.split("@")[-1].strip().rstrip(">").lower()
+        parts = domain_part.split(".")
+        if len(parts) >= 2:
+            primary = parts[-2] if len(parts[-1]) <= 3 and len(parts) >= 2 else parts[0]
+            clean_name = re.sub(r"[^a-zA-Z0-9_-]", "", primary).strip()
+            if clean_name and len(clean_name) >= 2:
+                return (
+                    clean_name.upper()
+                    if len(clean_name) <= 4
+                    else clean_name.replace("-", " ").title()
+                )
         return None
 
     def search_emails(
@@ -371,7 +359,7 @@ class MailToolKit:
 
     def create_folder(self, folder: str) -> dict[str, Any]:
         """
-        Create a new folder or nested subfolder (e.g. 'German Universities/TU Dresden').
+        Create a new folder or nested subfolder (e.g. 'Archive/2026', 'Projects/Alpha').
         If the folder already exists, returns existing status gracefully.
         """
         with self._get_mailbox() as mailbox:
@@ -439,15 +427,15 @@ class MailToolKit:
         """
         Organize emails in the mailbox.
         Supports:
-        1. Category-based organization (e.g. category='German Universities', date_gte='2026-05-01', nested_subfolders=True)
+        1. Category-based organization (e.g. category='Archive', nested_subfolders=True)
         2. Rule-based criteria (rules=[{"match": {...}, "action": "move", "destination": "..."}])
         """
         actions_taken = []
         processed = 0
 
-        # Mode A: Category / Academic Institution Organization
+        # Mode A: Category / Domain Organization
         if category or not rules:
-            root_folder = category or "German Universities"
+            root_folder = category or "Organized"
             with self._get_mailbox(folder=folder) as mailbox:
                 criteria: dict[str, Any] = {}
                 if date_gte:
@@ -459,44 +447,41 @@ class MailToolKit:
                     if parsed_lt:
                         criteria["date_lt"] = parsed_lt
 
-                # Fetch matching emails (prefer .de / academic tokens, fallback to date window)
+                query_filter = kwargs.get("query") or kwargs.get("text")
+                if query_filter:
+                    clean_q = (
+                        unicodedata.normalize("NFKD", str(query_filter))
+                        .encode("ascii", "ignore")
+                        .decode("ascii")
+                        .strip()
+                    )
+                    if clean_q:
+                        criteria["text"] = clean_q
+
                 try:
                     messages = list(
                         mailbox.fetch(
-                            AND(text=".de", **criteria) if criteria else AND(text=".de"),
+                            AND(**criteria) if criteria else AND(all=True),
                             limit=limit,
                             reverse=True,
                             mark_seen=False,
                         )
                     )
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"Error fetching emails for organization: {e}")
                     messages = []
-
-                if not messages:
-                    try:
-                        messages = list(
-                            mailbox.fetch(
-                                AND(**criteria) if criteria else AND(all=True),
-                                limit=limit,
-                                reverse=True,
-                                mark_seen=False,
-                            )
-                        )
-                    except Exception as e:
-                        logger.warning(f"Error fetching emails for organization: {e}")
-                        messages = []
 
                 folders_created = set()
                 for msg in messages:
                     processed += 1
                     sender = getattr(msg, "from_", "") or ""
                     subject = getattr(msg, "subject", "") or ""
-                    institution = self._extract_institution(sender, subject)
-                    if not institution:
+                    domain_label = self._extract_domain_label(sender)
+                    if not domain_label:
                         continue
 
                     dest_folder = (
-                        f"{root_folder}/{institution}" if nested_subfolders else root_folder
+                        f"{root_folder}/{domain_label}" if nested_subfolders else root_folder
                     )
                     try:
                         if not mailbox.folder.exists(dest_folder):
@@ -512,7 +497,7 @@ class MailToolKit:
                             {
                                 "uid": uid,
                                 "action": "move",
-                                "institution": institution,
+                                "label": domain_label,
                                 "destination": dest_folder,
                                 "subject": subject,
                                 "from": sender,

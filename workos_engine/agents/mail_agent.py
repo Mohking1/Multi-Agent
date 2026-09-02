@@ -110,20 +110,6 @@ class MailAgent(BaseSubagent):
         instruction = (task.instruction or "").lower().strip()
         ctx = dict(task.context or {})
 
-        # Normalize organize instructions
-        if instruction in ("organize_emails", "organize"):
-            query_str = (str(ctx.get("query", "")) + " " + (task.instruction or "")).lower()
-            if "category" not in ctx:
-                if (
-                    "german" in query_str
-                    or "university" in query_str
-                    or "universities" in query_str
-                ):
-                    ctx["category"] = "German Universities"
-            if "date_gte" not in ctx:
-                if "may" in query_str:
-                    ctx["date_gte"] = "2026-05-01"
-
         # Direct mapped tool calls
         mapped_tools = {
             "search_emails": "search_emails",
@@ -391,21 +377,21 @@ class MailAgent(BaseSubagent):
             },
             {
                 "name": "organize_emails",
-                "description": "Automatically categorize and move emails into folders or subfolders based on category (e.g. 'German Universities') or custom rules.",
+                "description": "Automatically categorize and move emails into folders or subfolders based on category or custom rules.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "category": {
                             "type": "string",
-                            "description": "Category or parent folder name (e.g. 'German Universities').",
+                            "description": "Category or parent folder name (e.g. 'Archive', 'Receipts').",
                         },
                         "date_gte": {
                             "type": "string",
-                            "description": "Start date (YYYY-MM-DD) to organize emails from (e.g. '2026-05-01').",
+                            "description": "Start date (YYYY-MM-DD) to filter emails.",
                         },
                         "nested_subfolders": {
                             "type": "boolean",
-                            "description": "Whether to sort into subfolders per institution/university. Defaults to true.",
+                            "description": "Whether to sort into subfolders by sender domain or subcategory. Defaults to true.",
                         },
                         "rules": {
                             "type": "array",
@@ -429,7 +415,7 @@ class MailAgent(BaseSubagent):
             },
             {
                 "name": "create_folder",
-                "description": "Create a new IMAP folder or nested subfolder (e.g. 'German Universities' or 'German Universities/TU Dresden').",
+                "description": "Create a new IMAP folder or nested subfolder (e.g. 'Archive/2026', 'Projects/Alpha').",
                 "parameters": {
                     "type": "object",
                     "properties": {

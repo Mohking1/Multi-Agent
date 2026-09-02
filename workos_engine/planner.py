@@ -576,7 +576,6 @@ class ExecutivePlanner:
                             actions = s.result.data.get("actions_taken", [])
                             if actions:
                                 status_str += "\nSample Organized Emails:\n" + "\n".join(
-                                    f"  - [{a.get('institution')}] {a.get('from')}: {a.get('subject')} -> {a.get('destination')}"
                                     for a in actions[:15]
                                 )
                     else:
