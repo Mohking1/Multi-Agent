@@ -343,7 +343,6 @@
         <div class="lg:col-span-5 space-y-5">
           
           <!-- Selected Evidence & Citation Card -->
-          <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-4">
           <div id="citation-inspector-card" class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-4 scroll-mt-6">
             <div class="flex items-center justify-between border-b border-obsidian-border pb-3">
               <div class="flex items-center space-x-2">
@@ -653,9 +652,6 @@
             const cleanId = String(citationId).replace(/[\[\]]/g, '').trim();
             let match = null;
             if (this.executionResult && this.executionResult.citations) {
-              const match = this.executionResult.citations.find(c => c.citation_id === citationId || c.citation_id === `[${citationId}]`);
-              if (match) {
-                this.selectCitation(match);
               match = this.executionResult.citations.find(c => {
                 const cId = String(c.citation_id || '').replace(/[\[\]]/g, '').trim();
                 return cId === cleanId;
@@ -955,7 +951,6 @@
 
           // 4. Interactive citation badges [1], [2], etc.
           html = html.replace(/\[(\d+)\]/g, (match, num) => {
-            return `<span class="citation-tag" onclick="window.handleCitationClick('[${num}]')">[${num}]</span>`;
             return `<button type="button" class="citation-tag inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded text-xs font-mono font-bold bg-cyan-950/60 border border-brand-cyan/50 text-brand-cyan hover:bg-brand-cyan hover:text-gray-950 transition cursor-pointer shadow-sm" onclick="window.handleCitationClick('${num}')">[${num}]</button>`;
           });
 

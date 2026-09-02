@@ -316,8 +316,6 @@ class ExecutivePlanner:
             "Agent Selection Rules:\n"
             "- If the user mentions 'emails', 'inbox', 'folder', 'organize emails', or 'sort emails': ALWAYS use 'mail_agent'. Do NOT use 'web_agent' unless the user explicitly requested online web searching.\n"
             "- Use 'web_agent' ONLY if the user explicitly asks to search online, web, internet, or check external deadlines.\n\n"
-            "Directives for Email Organization:\n"
-            "For email organization or sorting requests, create a step for 'mail_agent' with structured input_data:\n"
             "Output strictly valid JSON in this exact structure:\n"
             "{\n"
             '  "goal": "<user request>",\n'
@@ -513,6 +511,8 @@ class ExecutivePlanner:
             # 3. Extract instruction and context
             instruction = resolved_inputs.get("instruction") or step.description
             context_args = {k: v for k, v in resolved_inputs.items() if k != "instruction"}
+            context_args.setdefault("goal", plan.goal)
+            context_args.setdefault("step_description", step.description)
 
             task = SubagentTask(
                 task_id=f"step_{step.step_id}_{uuid.uuid4().hex[:6]}",

@@ -458,6 +458,14 @@ class MailToolKit:
 
         # Mode A: Category / Domain Organization
         if category or not rules:
+            if not category and not domain_pattern and not kwargs.get("text") and not date_gte:
+                return {
+                    "status": "skipped",
+                    "category": None,
+                    "organized_count": 0,
+                    "folders_created": [],
+                    "message": "Organization skipped: No category, domain filter, or search criteria provided.",
+                }
             root_folder = category or "Organized"
             self.create_folder(root_folder)
 
@@ -474,18 +482,9 @@ class MailToolKit:
             if domain_pattern:
                 criteria["from_"] = domain_pattern
 
-            query_filter = kwargs.get("query") or kwargs.get("text")
-            if (
-                query_filter
-                and len(str(query_filter).split()) <= 2
-                and not any(
-                    w in str(query_filter).lower() for w in ["organize", "today", "may", "german"]
-                )
-            ):
             text_filter = kwargs.get("text")
             if text_filter and isinstance(text_filter, str) and text_filter.strip():
                 clean_q = (
-                    unicodedata.normalize("NFKD", str(query_filter))
                     unicodedata.normalize("NFKD", text_filter)
                     .encode("ascii", "ignore")
                     .decode("ascii")

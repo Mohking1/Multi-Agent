@@ -4,6 +4,7 @@ import datetime
 import json
 import logging
 import os
+import re
 from typing import Any
 
 from config import WorkOSConfig
@@ -120,6 +121,9 @@ class MailAgent(BaseSubagent):
             instruction in ("organize", "organize_emails")
             or "organize" in instruction
             or "sort" in instruction
+            or "subfolder" in instruction
+            or "subfolders" in instruction
+            or "move_emails" in instruction
         ):
             instruction = "organize_emails"
             if "folder_name" in ctx and "category" not in ctx:
@@ -129,9 +133,11 @@ class MailAgent(BaseSubagent):
                 filter(
                     None,
                     [
+                        ctx.get("goal"),
+                        ctx.get("step_description"),
                         ctx.get("category"),
+                        ctx.get("folder_name"),
                         ctx.get("query"),
-                        getattr(task, "description", None),
                         task.instruction,
                     ],
                 )
@@ -155,7 +161,6 @@ class MailAgent(BaseSubagent):
                         "- category: (string) parent folder name\n"
                         f"- date_gte: (string) YYYY-MM-DD start date (use year {today.year} if year is omitted)\n"
                         "- date_lt: (string) YYYY-MM-DD end date, or null\n"
-                        "- domain_pattern: (string) country code top-level domain or email domain filter (e.g. .de for German institutions, .edu for colleges, etc., or empty string)\n"
                         "- domain_pattern: (string) top-level domain or sender domain filter if specified in the request, or empty string\n"
                         "- nested_subfolders: (boolean) true if requested to sort into subfolders/folder-inside-folder, false otherwise\n"
                     )
@@ -163,8 +168,26 @@ class MailAgent(BaseSubagent):
                     if extracted_json:
                         params = json.loads(extracted_json)
                         for k, v in params.items():
-                            if v and k not in ctx:
+                            if v and (k not in ctx or not ctx[k]):
                                 ctx[k] = v
+
+                    # If domain_pattern is still missing or empty, deduce ccTLD or domain suffix from entity mentioned
+                    if not ctx.get("domain_pattern"):
+                        entity_prompt = (
+                            f'User Request: "{query_text}"\n'
+                            "Identify any country, organization, or entity in the request, and determine the Internet domain suffix or country code TLD (ccTLD) used for official email addresses from that entity/country. If there is no specific entity or country, respond with 'all'.\n"
+                            "Output format:\n"
+                            "Country/Entity: <name>\n"
+                            "Domain Suffix: <.tld or domain>"
+                        )
+                        deduced_text = client.generate(prompt=entity_prompt)
+                        m_suffix = re.search(
+                            r"Domain Suffix:\s*(\.[a-z0-9_.-]+)", deduced_text, re.I
+                        )
+                        if m_suffix:
+                            suffix = m_suffix.group(1).lower().strip()
+                            if suffix not in (".com", ".net", ".org"):
+                                ctx["domain_pattern"] = suffix
                 except Exception as e:
                     logger.debug(f"LLM organization parameter extraction skipped: {e}")
 
@@ -190,6 +213,10 @@ class MailAgent(BaseSubagent):
             "create_folder": "create_folder",
             "organize_emails": "organize_emails",
             "organize": "organize_emails",
+            "create_subfolder": "organize_emails",
+            "create_subfolders": "organize_emails",
+            "move_emails_to_folder": "organize_emails",
+            "move_to_folder": "organize_emails",
         }
 
         if instruction in mapped_tools:
