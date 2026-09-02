@@ -359,31 +359,53 @@ class MailToolKit:
 
     def create_folder(self, folder: str) -> dict[str, Any]:
         """
-        Create a new folder or nested subfolder (e.g. 'Archive/2026', 'Projects/Alpha').
-        If the folder already exists, returns existing status gracefully.
+        Create a new folder or nested subfolder hierarchy (e.g. 'Archive/2026', 'Projects/Alpha').
+        Sequentially ensures that each ancestor folder exists from root to leaf,
+        supporting IMAP server delimiters (such as '/' in Gmail).
         """
         with self._get_mailbox() as mailbox:
+            delim = "/"
             try:
-                if mailbox.folder.exists(folder):
-                    return {"status": "exists", "folder": folder}
-                mailbox.folder.create(folder)
-                return {"status": "created", "folder": folder}
-            except Exception as e:
-                err_msg = str(e).lower()
-                if "exist" in err_msg or "duplicate" in err_msg or "already" in err_msg:
-                    return {"status": "exists", "folder": folder}
-                raise
+                for f in mailbox.folder.list():
+                    if getattr(f, "delim", None):
+                        delim = f.delim
+                        break
+            except Exception:
+                pass
+
+            normalized_folder = folder.replace("\\", delim).replace("/", delim).strip(delim)
+            parts = [p.strip() for p in normalized_folder.split(delim) if p.strip()]
+
+            created_folders = []
+            current_path = ""
+            for part in parts:
+                current_path = f"{current_path}{delim}{part}" if current_path else part
+                try:
+                    if not mailbox.folder.exists(current_path):
+                        mailbox.folder.create(current_path)
+                        created_folders.append(current_path)
+                except Exception as e:
+                    err_msg = str(e).lower()
+                    if (
+                        "exist" not in err_msg
+                        and "duplicate" not in err_msg
+                        and "already" not in err_msg
+                    ):
+                        raise
+
+            return {
+                "status": "created" if created_folders else "exists",
+                "folder": current_path,
+                "created_hierarchy": created_folders,
+                "delimiter": delim,
+            }
 
     def move_email(
         self, uid: str, destination_folder: str, source_folder: str = "INBOX"
     ) -> dict[str, Any]:
-        """Move an email from one folder to another, ensuring the destination folder exists."""
+        """Move an email from one folder to another, ensuring the destination hierarchy exists."""
+        self.create_folder(destination_folder)
         with self._get_mailbox(folder=source_folder) as mailbox:
-            try:
-                if not mailbox.folder.exists(destination_folder):
-                    mailbox.folder.create(destination_folder)
-            except Exception as e:
-                logger.debug(f"Ensuring destination folder '{destination_folder}' before move: {e}")
             mailbox.move(uid, destination_folder)
         return {
             "status": "moved",
@@ -420,8 +442,9 @@ class MailToolKit:
         date_gte: Any = None,
         date_lt: Any = None,
         nested_subfolders: bool = True,
+        domain_pattern: str | None = None,
         folder: str = "INBOX",
-        limit: int = 200,
+        limit: int = 500,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """
@@ -436,76 +459,167 @@ class MailToolKit:
         # Mode A: Category / Domain Organization
         if category or not rules:
             root_folder = category or "Organized"
-            with self._get_mailbox(folder=folder) as mailbox:
-                criteria: dict[str, Any] = {}
-                if date_gte:
-                    parsed_gte = self._parse_date(date_gte)
-                    if parsed_gte:
-                        criteria["date_gte"] = parsed_gte
-                if date_lt:
-                    parsed_lt = self._parse_date(date_lt)
-                    if parsed_lt:
-                        criteria["date_lt"] = parsed_lt
+            self.create_folder(root_folder)
 
-                query_filter = kwargs.get("query") or kwargs.get("text")
-                if query_filter:
-                    clean_q = (
-                        unicodedata.normalize("NFKD", str(query_filter))
-                        .encode("ascii", "ignore")
-                        .decode("ascii")
-                        .strip()
-                    )
-                    if clean_q:
-                        criteria["text"] = clean_q
+            criteria: dict[str, Any] = {}
+            if date_gte:
+                parsed_gte = self._parse_date(date_gte)
+                if parsed_gte:
+                    criteria["date_gte"] = parsed_gte
+            if date_lt:
+                parsed_lt = self._parse_date(date_lt)
+                if parsed_lt:
+                    criteria["date_lt"] = parsed_lt
 
+            if domain_pattern:
+                criteria["from_"] = domain_pattern
+
+            query_filter = kwargs.get("query") or kwargs.get("text")
+            if (
+                query_filter
+                and len(str(query_filter).split()) <= 2
+                and not any(
+                    w in str(query_filter).lower() for w in ["organize", "today", "may", "german"]
+                )
+            ):
+                clean_q = (
+                    unicodedata.normalize("NFKD", str(query_filter))
+                    .encode("ascii", "ignore")
+                    .decode("ascii")
+                    .strip()
+                )
+                if clean_q:
+                    criteria["text"] = clean_q
+
+            folders_to_search = [folder]
+            if folder == "INBOX":
+                folders_to_search.append("[Gmail]/All Mail")
+
+            folders_created = set()
+            moved_uids = set()
+
+            for search_folder in folders_to_search:
                 try:
-                    messages = list(
-                        mailbox.fetch(
-                            AND(**criteria) if criteria else AND(all=True),
-                            limit=limit,
-                            reverse=True,
-                            mark_seen=False,
-                        )
-                    )
+                    with self._get_mailbox(folder=search_folder) as mailbox:
+                        delim = "/"
+                        try:
+                            for f in mailbox.folder.list():
+                                if getattr(f, "delim", None):
+                                    delim = f.delim
+                                    break
+                        except Exception:
+                            pass
+
+                        def _ensure_on_connection(mb: Any, path: str, d: str = "/") -> None:
+                            norm = path.replace("\\", d).replace("/", d).strip(d)
+                            parts = [p.strip() for p in norm.split(d) if p.strip()]
+                            curr = ""
+                            for p in parts:
+                                curr = f"{curr}{d}{p}" if curr else p
+                                try:
+                                    if not mb.folder.exists(curr):
+                                        mb.folder.create(curr)
+                                except Exception as err:
+                                    err_str = str(err).lower()
+                                    if (
+                                        "exist" not in err_str
+                                        and "duplicate" not in err_str
+                                        and "already" not in err_str
+                                    ):
+                                        logger.debug(f"Error creating '{curr}': {err}")
+
+                        _ensure_on_connection(mailbox, root_folder, delim)
+
+                        try:
+                            messages = list(
+                                mailbox.fetch(
+                                    AND(**criteria) if criteria else AND(all=True),
+                                    limit=limit,
+                                    reverse=True,
+                                    headers_only=True,
+                                    mark_seen=False,
+                                )
+                            )
+                        except Exception as e:
+                            logger.warning(f"Error fetching emails from {search_folder}: {e}")
+                            messages = []
+
+                        for msg in messages:
+                            processed += 1
+                            uid = str(getattr(msg, "uid", ""))
+                            if uid in moved_uids:
+                                continue
+
+                            sender = getattr(msg, "from_", "") or ""
+                            subject = getattr(msg, "subject", "") or ""
+
+                            if domain_pattern:
+                                pat = domain_pattern.lower().strip().lstrip(".")
+                                sender_domain = (
+                                    sender.split("@")[-1].lower().rstrip(">")
+                                    if "@" in sender
+                                    else ""
+                                )
+                                if not (
+                                    sender_domain.endswith(f".{pat}")
+                                    or sender_domain == pat
+                                    or f".{pat}." in sender_domain
+                                ):
+                                    continue
+
+                            domain_label = self._extract_domain_label(sender)
+                            if not domain_label:
+                                continue
+
+                            if domain_label.lower() in (
+                                "gmail",
+                                "yahoo",
+                                "hotmail",
+                                "outlook",
+                                "icloud",
+                            ):
+                                continue
+
+                            dest_folder = (
+                                f"{root_folder}/{domain_label}"
+                                if nested_subfolders
+                                else root_folder
+                            )
+                            try:
+                                _ensure_on_connection(mailbox, dest_folder, delim)
+                                folders_created.add(dest_folder)
+                            except Exception as e:
+                                logger.debug(f"Ensuring folder '{dest_folder}': {e}")
+
+                            try:
+                                mailbox.move(uid, dest_folder)
+                                moved_uids.add(uid)
+                                if nested_subfolders and root_folder != dest_folder:
+                                    try:
+                                        mailbox.copy(uid, root_folder)
+                                    except Exception:
+                                        pass
+
+                                actions_taken.append(
+                                    {
+                                        "uid": uid,
+                                        "action": "move",
+                                        "label": domain_label,
+                                        "destination": dest_folder,
+                                        "subject": subject,
+                                        "from": sender,
+                                        "date": str(getattr(msg, "date", ""))[:10],
+                                    }
+                                )
+                            except Exception as err:
+                                logger.warning(
+                                    f"Failed to move email {uid} to {dest_folder}: {err}"
+                                )
+
+                    if actions_taken:
+                        break
                 except Exception as e:
-                    logger.warning(f"Error fetching emails for organization: {e}")
-                    messages = []
-
-                folders_created = set()
-                for msg in messages:
-                    processed += 1
-                    sender = getattr(msg, "from_", "") or ""
-                    subject = getattr(msg, "subject", "") or ""
-                    domain_label = self._extract_domain_label(sender)
-                    if not domain_label:
-                        continue
-
-                    dest_folder = (
-                        f"{root_folder}/{domain_label}" if nested_subfolders else root_folder
-                    )
-                    try:
-                        if not mailbox.folder.exists(dest_folder):
-                            mailbox.folder.create(dest_folder)
-                            folders_created.add(dest_folder)
-                    except Exception as e:
-                        logger.debug(f"Ensuring folder '{dest_folder}': {e}")
-
-                    uid = str(getattr(msg, "uid", ""))
-                    try:
-                        mailbox.move(uid, dest_folder)
-                        actions_taken.append(
-                            {
-                                "uid": uid,
-                                "action": "move",
-                                "label": domain_label,
-                                "destination": dest_folder,
-                                "subject": subject,
-                                "from": sender,
-                                "date": str(getattr(msg, "date", ""))[:10],
-                            }
-                        )
-                    except Exception as err:
-                        logger.warning(f"Failed to move email {uid} to {dest_folder}: {err}")
+                    logger.debug(f"Skipping search in {search_folder}: {e}")
 
             return {
                 "status": "organized",

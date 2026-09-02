@@ -1,5 +1,8 @@
 """Mail specialist subagent enforcing autonomy policies and dispatching email tools."""
 
+import datetime
+import json
+import logging
 import os
 from typing import Any
 
@@ -7,6 +10,8 @@ from config import WorkOSConfig
 from workos_engine.agents.base import BaseSubagent
 from workos_engine.tools.mail_tools import MailToolKit
 from workos_engine.types import AutonomyLevel, ExecutionResult, SubagentTask
+
+logger = logging.getLogger(__name__)
 
 
 class MailAgent(BaseSubagent):
@@ -109,6 +114,58 @@ class MailAgent(BaseSubagent):
         """Executes a delegated email task instruction or runs autonomous micro-ReAct loop."""
         instruction = (task.instruction or "").lower().strip()
         ctx = dict(task.context or {})
+
+        # For organize instructions, if unstructured query is provided, dynamically parse parameters via LLM
+        if (
+            instruction in ("organize", "organize_emails")
+            or "organize" in instruction
+            or "sort" in instruction
+        ):
+            instruction = "organize_emails"
+            if "folder_name" in ctx and "category" not in ctx:
+                ctx["category"] = ctx["folder_name"]
+
+            query_text = " ".join(
+                filter(
+                    None,
+                    [
+                        ctx.get("category"),
+                        ctx.get("query"),
+                        getattr(task, "description", None),
+                        task.instruction,
+                    ],
+                )
+            ).strip()
+
+            client = getattr(self, "model_client", None) or getattr(self, "llm_client", None)
+            if (
+                client
+                and hasattr(client, "generate")
+                and (
+                    "category" not in ctx or "date_gte" not in ctx or not ctx.get("domain_pattern")
+                )
+            ):
+                try:
+                    today = datetime.date.today()
+                    extraction_prompt = (
+                        f"Today is {today.isoformat()} (Year {today.year}).\n"
+                        f"Extract structured mail organization parameters from this request:\n"
+                        f'Request: "{query_text}"\n\n'
+                        "Respond with a single JSON object with these keys:\n"
+                        "- category: (string) parent folder name\n"
+                        f"- date_gte: (string) YYYY-MM-DD start date (use year {today.year} if year is omitted)\n"
+                        "- date_lt: (string) YYYY-MM-DD end date, or null\n"
+                        "- domain_pattern: (string) country code top-level domain or email domain filter (e.g. .de for German institutions, .edu for colleges, etc., or empty string)\n"
+                        "- nested_subfolders: (boolean) true if requested to sort into subfolders/folder-inside-folder, false otherwise\n"
+                    )
+                    extracted_json = client.generate(prompt=extraction_prompt, format="json")
+                    if extracted_json:
+                        params = json.loads(extracted_json)
+                        for k, v in params.items():
+                            if v and k not in ctx:
+                                ctx[k] = v
+                except Exception as e:
+                    logger.debug(f"LLM organization parameter extraction skipped: {e}")
 
         # Direct mapped tool calls
         mapped_tools = {

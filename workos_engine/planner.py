@@ -313,15 +313,11 @@ class ExecutivePlanner:
             "- 'web_agent': Live web search, news, portals, and online timelines.\n"
             "- 'doc_agent': Document and table parsing.\n"
             "- 'rag_agent': Internal knowledge base search.\n\n"
-            "Directives:\n"
-            "1. If the task is internal email management or organization, use ONLY 'mail_agent'. Do NOT call 'web_agent' unless the user explicitly requested online web searching.\n"
-            "2. If the request asks to check emails AND search online, create sequential steps: Step 1 (mail_agent), Step 2 (web_agent).\n"
-            "3. Output strictly valid JSON in this exact structure:\n"
-            "{\n"
-            '  "goal": "<user request>",\n'
-            '  "steps": [\n'
-            '    {"step_id": 1, "assigned_agent": "<agent_name>", "description": "<concise description of action>", "input_data": {"instruction": "<action>", "query": "<search keyword or parameters>"}}\n'
-            "  ]\n"
+            "Agent Selection Rules:\n"
+            "- If the user mentions 'emails', 'inbox', 'folder', 'organize emails', or 'sort emails': ALWAYS use 'mail_agent'. Do NOT use 'web_agent' unless the user explicitly requested online web searching.\n"
+            "- Use 'web_agent' ONLY if the user explicitly asks to search online, web, internet, or check external deadlines.\n\n"
+            "Directives for Email Organization:\n"
+            "For email organization or sorting requests, create a step for 'mail_agent' with structured input_data:\n"
             "}"
         )
 
@@ -576,6 +572,7 @@ class ExecutivePlanner:
                             actions = s.result.data.get("actions_taken", [])
                             if actions:
                                 status_str += "\nSample Organized Emails:\n" + "\n".join(
+                                    f"  - [{a.get('label') or 'Email'}] {a.get('from')}: {a.get('subject')} -> {a.get('destination')}"
                                     for a in actions[:15]
                                 )
                     else:
