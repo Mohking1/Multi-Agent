@@ -156,6 +156,7 @@ class MailAgent(BaseSubagent):
                         f"- date_gte: (string) YYYY-MM-DD start date (use year {today.year} if year is omitted)\n"
                         "- date_lt: (string) YYYY-MM-DD end date, or null\n"
                         "- domain_pattern: (string) country code top-level domain or email domain filter (e.g. .de for German institutions, .edu for colleges, etc., or empty string)\n"
+                        "- domain_pattern: (string) top-level domain or sender domain filter if specified in the request, or empty string\n"
                         "- nested_subfolders: (boolean) true if requested to sort into subfolders/folder-inside-folder, false otherwise\n"
                     )
                     extracted_json = client.generate(prompt=extraction_prompt, format="json")

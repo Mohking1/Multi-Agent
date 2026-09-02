@@ -318,6 +318,12 @@ class ExecutivePlanner:
             "- Use 'web_agent' ONLY if the user explicitly asks to search online, web, internet, or check external deadlines.\n\n"
             "Directives for Email Organization:\n"
             "For email organization or sorting requests, create a step for 'mail_agent' with structured input_data:\n"
+            "Output strictly valid JSON in this exact structure:\n"
+            "{\n"
+            '  "goal": "<user request>",\n'
+            '  "steps": [\n'
+            '    {"step_id": 1, "assigned_agent": "<agent_name>", "description": "<concise description of action>", "input_data": {"instruction": "<action>", "query": "<search keyword or parameters>"}}\n'
+            "  ]\n"
             "}"
         )
 

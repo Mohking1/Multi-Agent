@@ -482,8 +482,11 @@ class MailToolKit:
                     w in str(query_filter).lower() for w in ["organize", "today", "may", "german"]
                 )
             ):
+            text_filter = kwargs.get("text")
+            if text_filter and isinstance(text_filter, str) and text_filter.strip():
                 clean_q = (
                     unicodedata.normalize("NFKD", str(query_filter))
+                    unicodedata.normalize("NFKD", text_filter)
                     .encode("ascii", "ignore")
                     .decode("ascii")
                     .strip()
