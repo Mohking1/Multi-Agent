@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WorkOS — Executive AI Operating System</title>
+  <title>Argus OS — Executive AI Operating System</title>
+  <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -14,17 +15,22 @@
         extend: {
           colors: {
             brand: {
-              teal: '#0D9488',
-              tealLight: '#14B8A6',
-              amber: '#F59E0B',
-              coral: '#EA580C',
+              indigo: '#6366F1',
+              indigoHover: '#4F46E5',
+              cyan: '#06B6D4',
               emerald: '#10B981',
+              amber: '#F59E0B',
               rose: '#EF4444',
             },
-            zinc: {
-              850: '#1F1F23',
-              900: '#18181B',
-              950: '#09090B',
+            surface: {
+              0: '#09090B',
+              1: '#121215',
+              2: '#18181B',
+              3: '#222227',
+            },
+            border: {
+              subtle: '#27272A',
+              muted: '#1E1E22',
             }
           },
           fontFamily: {
@@ -36,1419 +42,769 @@
     }
   </script>
 
-  <!-- Alpine.js -->
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <!-- Phosphor / FontAwesome Icons -->
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <!-- Marked.js Markdown Engine -->
+  
+  <!-- Markdown & Syntax Highlighting -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <!-- Highlight.js for Syntax Highlighting -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <!-- KaTeX LaTeX Math Engine -->
+  
+  <!-- KaTeX LaTeX Formula Engine -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-    
-    body {
-      font-family: 'Inter', sans-serif;
-      background-color: #09090B;
-      color: #FAFAFA;
-    }
-    code, pre, .font-mono {
-      font-family: 'JetBrains Mono', monospace;
-    }
-    
-    /* Scrollbar */
-    ::-webkit-scrollbar {
-      width: 5px;
-      height: 5px;
-    }
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #27272A;
-      border-radius: 3px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #3F3F46;
-    }
+  <!-- Custom Swiss Dark Stylesheet -->
+  <link rel="stylesheet" href="/static/styles.css">
 
-    /* Markdown prose styles */
-    .prose-workos {
-      color: #E4E4E7;
-      font-size: 0.9375rem;
-      line-height: 1.65;
-    }
-    .prose-workos p {
-      margin-bottom: 0.75rem;
-    }
-    .prose-workos p:last-child {
-      margin-bottom: 0;
-    }
-    .prose-workos h1, .prose-workos h2, .prose-workos h3, .prose-workos h4 {
-      color: #FAFAFA;
-      font-weight: 600;
-      margin-top: 1.25rem;
-      margin-bottom: 0.5rem;
-    }
-    .prose-workos h2 {
-      font-size: 1.15rem;
-      border-bottom: 1px solid #27272A;
-      padding-bottom: 0.35rem;
-    }
-    .prose-workos ul, .prose-workos ol {
-      margin: 0.75rem 0;
-      padding-left: 1.25rem;
-    }
-    .prose-workos ul {
-      list-style-type: disc;
-    }
-    .prose-workos ol {
-      list-style-type: decimal;
-    }
-    .prose-workos li {
-      margin-bottom: 0.35rem;
-    }
-    .prose-workos pre {
-      background-color: #121215;
-      border: 1px solid #27272A;
-      border-radius: 6px;
-      padding: 0.875rem 1rem;
-      margin: 0.875rem 0;
-      overflow-x: auto;
-    }
-    .prose-workos pre code {
-      background: none;
-      padding: 0;
-      border: none;
-      font-size: 0.8125rem;
-      color: #38BDF8;
-    }
-    .prose-workos code:not(pre code) {
-      background-color: #1F1F23;
-      border: 1px solid #27272A;
-      padding: 0.1rem 0.35rem;
-      border-radius: 4px;
-      font-size: 0.8125rem;
-      color: #2DD4BF;
-    }
-    .prose-workos blockquote {
-      border-left: 3px solid #0D9488;
-      padding-left: 0.875rem;
-      margin: 0.75rem 0;
-      color: #A1A1AA;
-      background: rgba(13, 148, 136, 0.05);
-      border-radius: 0 4px 4px 0;
-      padding-top: 0.25rem;
-      padding-bottom: 0.25rem;
-    }
-    .prose-workos table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 0.875rem 0;
-      font-size: 0.8125rem;
-      border-radius: 6px;
-      overflow: hidden;
-    }
-    .prose-workos th, .prose-workos td {
-      border: 1px solid #27272A;
-      padding: 0.5rem 0.75rem;
-      text-align: left;
-    }
-    .prose-workos th {
-      background-color: #18181B;
-      color: #14B8A6;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .prose-workos tr:hover td {
-      background-color: rgba(24, 24, 27, 0.6);
-    }
-  </style>
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  
+  <!-- Argus OS Controller -->
+  <script src="/static/app.js"></script>
 </head>
 
-<body class="bg-zinc-950 text-zinc-100 h-screen flex flex-col antialiased overflow-hidden" x-data="workosApp()" x-init="initApp()">
+<body class="bg-[#09090B] text-zinc-100 h-screen flex flex-col antialiased overflow-hidden select-none"
+      x-data="argusApp()"
+      x-init="initApp()"
+      @dragover.prevent
+      @drop.prevent="handleFileUpload($event)">
 
-  <!-- Top Executive Header -->
-  <header class="h-14 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md shrink-0 px-5 flex items-center justify-between z-30">
-    <!-- Brand & Status -->
+  <!-- ===================================================================== -->
+  <!-- TOP EXECUTIVE HEADER                                                  -->
+  <!-- ===================================================================== -->
+  <header class="h-14 border-b border-[#27272A] bg-[#09090B]/90 backdrop-blur-md shrink-0 px-5 flex items-center justify-between z-30">
+    
+    <!-- Brand & Panoptic Emblem -->
     <div class="flex items-center gap-3">
-      <div class="flex items-center gap-2">
-        <div class="w-7 h-7 rounded-md bg-teal-600/20 border border-teal-500/40 flex items-center justify-center text-teal-400 font-bold text-sm">
-          <i class="fa-solid fa-layer-group text-xs"></i>
+      <div class="flex items-center gap-2.5 cursor-pointer" @click="newSession()">
+        <img src="/static/logo.svg" alt="Argus OS Logo" class="w-7 h-7 object-contain">
+        <div class="flex items-baseline gap-1.5">
+          <span class="font-semibold text-sm tracking-tight text-white">Argus OS</span>
+          <span class="text-[10px] font-mono text-indigo-400 font-medium">v0.2</span>
         </div>
-        <span class="font-semibold text-sm tracking-tight text-white">WorkOS</span>
       </div>
-      <span class="text-zinc-600 text-xs">/</span>
-      <span class="text-xs text-zinc-400 font-medium hidden sm:inline">Executive AI Operating System</span>
-      <span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-zinc-800 text-zinc-300 border border-zinc-700">100% Offline</span>
+      <span class="text-zinc-700 text-xs">/</span>
+      <span class="text-xs text-zinc-400 font-medium hidden md:inline truncate max-w-xs" x-text="currentSessionTitle"></span>
     </div>
 
-    <!-- Active Model & System Controls -->
-    <div class="flex items-center gap-3">
-      <!-- Prominent Model Switcher Button -->
-      <button @click="showModelModal = true" class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-zinc-900 border border-teal-500/30 hover:border-teal-500/60 text-xs text-zinc-200 transition shadow-sm group">
-        <div class="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></div>
-        <div class="flex flex-col text-left">
-          <span class="font-mono text-[11px] font-semibold text-teal-300" x-text="formatModelName(status.model_name)"></span>
-          <span class="text-[9px] text-zinc-400 font-mono">12,288 Context (GTX 1650 Sweet Spot)</span>
-        </div>
-        <i class="fa-solid fa-chevron-down text-[10px] text-zinc-500 group-hover:text-teal-400 ml-1 transition"></i>
-      </button>
+    <!-- Quick Jump Command Trigger (Cmd+K) -->
+    <button @click="commandPaletteOpen = true"
+      class="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-[#121215] border border-[#27272A] hover:border-zinc-600 text-xs text-zinc-400 hover:text-zinc-200 transition shadow-inner">
+      <i class="fa-solid fa-magnifying-glass text-[11px] text-zinc-500"></i>
+      <span>Search or jump to...</span>
+      <kbd class="px-1.5 py-0.5 rounded bg-[#18181B] border border-[#27272A] text-[10px] font-mono text-zinc-400">⌘K</kbd>
+    </button>
 
-      <!-- Autonomy Policy Pill -->
-      <button @click="togglePolicy()" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium transition"
-        :class="status.autonomy_level === 'FULL' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'">
+    <!-- Executive Controls & System Health -->
+    <div class="flex items-center gap-2.5">
+      
+      <!-- Autonomy Mode Toggle -->
+      <button @click="togglePolicy()"
+        class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition"
+        :class="status.autonomy_level === 'FULL'
+          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+          : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'"
+        :title="status.autonomy_level === 'FULL' ? 'Autonomous Mode: outbound actions execute immediately' : 'Supervised Mode: outbound mail staged for approval'">
         <i class="fa-solid" :class="status.autonomy_level === 'FULL' ? 'fa-bolt text-[10px]' : 'fa-shield-halved text-[10px]'"></i>
-        <span class="text-[11px]" x-text="status.autonomy_level"></span>
+        <span class="text-[11px]" x-text="status.autonomy_level === 'FULL' ? 'Autonomous' : 'Supervised'"></span>
       </button>
 
-      <!-- Refresh Sessions -->
-      <button @click="loadSessions()" title="Refresh Session History" class="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition">
-        <i class="fa-solid fa-rotate-right text-xs"></i>
+      <!-- System & Telemetry Slide-Over Trigger -->
+      <button @click="openSystemHub()"
+        class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#121215] border border-[#27272A] hover:border-zinc-600 text-xs text-zinc-300 transition"
+        title="Open System Diagnostics & Telemetry Hub">
+        <span class="w-2 h-2 rounded-full" :class="stats.system?.ollama_online ? 'bg-emerald-400' : 'bg-amber-400'"></span>
+        <span class="hidden md:inline text-[11px] font-mono" x-text="formatModelName(status.model_name)"></span>
+        <i class="fa-solid fa-sliders text-[10px] text-zinc-400 ml-0.5"></i>
       </button>
+
     </div>
   </header>
 
-  <!-- Main Multi-Column Viewport -->
-  <div class="flex-1 flex overflow-hidden">
+  <!-- ===================================================================== -->
+  <!-- MAIN MULTI-PANE VIEWPORT                                              -->
+  <!-- ===================================================================== -->
+  <div class="flex-1 flex overflow-hidden relative">
 
-    <!-- Left Navigation Bar (Fixed) -->
-    <aside class="w-56 border-r border-zinc-800/80 bg-zinc-950 flex flex-col justify-between p-3 shrink-0 select-none">
-      <div class="space-y-1">
-        <div class="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Navigation</div>
+    <!-- LEFT SIDEBAR (Collapsible, 260px) -->
+    <aside class="w-64 border-r border-[#27272A] bg-[#09090B] flex flex-col justify-between p-3 shrink-0 select-none z-20"
+      :class="sidebarCollapsed ? 'hidden' : 'flex'">
+      
+      <div class="space-y-3 overflow-hidden flex-1 flex flex-col">
         
-        <button @click="activeTab = 'chat'" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition"
-          :class="activeTab === 'chat' ? 'bg-zinc-850 text-white border border-zinc-700/60 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'">
-          <i class="fa-solid fa-message w-4 text-teal-400"></i>
-          <span>Assistant Chat</span>
+        <!-- Primary Action: New Session -->
+        <button @click="newSession()"
+          class="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-[#18181B] hover:bg-[#222227] text-white border border-[#27272A] hover:border-indigo-500/40 text-xs font-medium transition shadow-sm group">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-plus text-[11px] text-indigo-400 group-hover:rotate-90 transition-transform"></i>
+            <span>New Chat</span>
+          </div>
+          <kbd class="px-1.5 py-0.2 rounded bg-[#121215] border border-[#27272A] text-[9px] font-mono text-zinc-500">N</kbd>
         </button>
 
-        <button @click="activeTab = 'dag'" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition"
-          :class="activeTab === 'dag' ? 'bg-zinc-850 text-white border border-zinc-700/60 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'">
-          <i class="fa-solid fa-diagram-project w-4 text-sky-400"></i>
-          <span>Operations DAG</span>
-          <span x-show="currentPlan && currentPlan.steps && currentPlan.steps.length" class="ml-auto px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-800 text-zinc-400" x-text="currentPlan ? currentPlan.steps.length : ''"></span>
-        </button>
+        <!-- Workspaces Navigation -->
+        <div class="space-y-0.5">
+          <div class="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Workspace</div>
+          
+          <button @click="activeWorkspace = 'chat'"
+            class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition"
+            :class="activeWorkspace === 'chat' ? 'bg-[#18181B] text-white border border-[#27272A]' : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#121215]'">
+            <i class="fa-solid fa-message w-4 text-indigo-400 text-xs"></i>
+            <span>Executive Assistant</span>
+          </button>
 
-        <button @click="activeTab = 'memory'" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition"
-          :class="activeTab === 'memory' ? 'bg-zinc-850 text-white border border-zinc-700/60 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'">
-          <i class="fa-solid fa-brain w-4 text-purple-400"></i>
-          <span>Memory Palace</span>
-          <span class="ml-auto px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-800 text-zinc-400" x-text="status.active_beliefs_count"></span>
-        </button>
+          <button @click="openVaultWorkspace()"
+            class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-[#121215] transition">
+            <i class="fa-solid fa-folder-closed w-4 text-cyan-400 text-xs"></i>
+            <span>Document Vault</span>
+            <span class="ml-auto text-[10px] font-mono text-zinc-500" x-text="stats.vault?.document_count || 0"></span>
+          </button>
 
-        <button @click="activeTab = 'vault'" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition"
-          :class="activeTab === 'vault' ? 'bg-zinc-850 text-white border border-zinc-700/60 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'">
-          <i class="fa-solid fa-folder-closed w-4 text-amber-400"></i>
-          <span>Document Vault</span>
-          <span class="ml-auto px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-800 text-zinc-400" x-text="vaultDocuments.length"></span>
-        </button>
+          <button @click="openMailDrafts()"
+            class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-[#121215] transition">
+            <i class="fa-solid fa-inbox w-4 text-emerald-400 text-xs"></i>
+            <span>Supervised Drafts</span>
+            <span class="ml-auto text-[10px] font-mono text-zinc-500" x-text="stats.mail?.connected ? 'Online' : 'TLS'"></span>
+          </button>
 
-        <button @click="activeTab = 'mail'" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition"
-          :class="activeTab === 'mail' ? 'bg-zinc-850 text-white border border-zinc-700/60 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'">
-          <i class="fa-solid fa-inbox w-4 text-emerald-400"></i>
-          <span>Autonomous Mail</span>
-        </button>
-
-        <button @click="activeTab = 'debug'; loadDebugEvents()" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition"
-          :class="activeTab === 'debug' ? 'bg-zinc-850 text-white border border-zinc-700/60 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'">
-          <i class="fa-solid fa-bug w-4 text-rose-400"></i>
-          <span>Debug Inspector</span>
-          <span x-show="debugSummary?.error_count > 0" class="ml-auto px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500/20 text-rose-300 font-mono font-bold" x-text="debugSummary.error_count"></span>
-          <span x-show="!debugSummary?.error_count && debugSummary?.total_events > 0" class="ml-auto px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-800 text-zinc-400 font-mono" x-text="debugSummary.total_events"></span>
-        </button>
-      </div>
-
-      <!-- Quick Model Info in Sidebar -->
-      <div class="p-3 bg-zinc-900/80 border border-zinc-800 rounded-lg">
-        <div class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5 flex items-center justify-between">
-          <span>Inference Engine</span>
-          <button @click="showModelModal = true" class="text-teal-400 hover:underline text-[10px]">Change</button>
-        </div>
-        <div class="font-mono text-[11px] font-medium text-white truncate" x-text="formatModelName(status.model_name)"></div>
-        <div class="text-[10px] text-zinc-400 mt-0.5">12,288 Context (GTX 1650 Sweet Spot)</div>
-        <div class="mt-2 text-[10px] text-teal-400/90 flex items-center gap-1.5">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-          <span>Fine-tuned for Tool Calling</span>
-        </div>
-      </div>
-
-      <!-- Infrastructure Status in Sidebar -->
-      <div class="mt-2 p-3 bg-zinc-900/80 border border-zinc-800 rounded-lg">
-        <div class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5 flex items-center justify-between">
-          <span>Local Infra</span>
-          <button @click="restartInfra()" title="Auto-restart missing services" class="text-teal-400 hover:text-teal-300 text-[10px] flex items-center gap-1">
-            <i class="fa-solid fa-rotate-right text-[9px]" :class="isRestartingInfra ? 'animate-spin' : ''"></i>
-            <span>Check</span>
+          <button @click="openMemoryInspector()"
+            class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-[#121215] transition">
+            <i class="fa-solid fa-brain w-4 text-purple-400 text-xs"></i>
+            <span>Cognitive Memory</span>
+            <span class="ml-auto text-[10px] font-mono text-zinc-500" x-text="stats.memory?.active_beliefs_count || 0"></span>
           </button>
         </div>
-        <div class="space-y-1.5 text-[10px]">
-          <div class="flex items-center justify-between">
-            <span class="text-zinc-400">Ollama (12K)</span>
-            <span class="flex items-center gap-1 font-mono" :class="infra?.services?.ollama?.online ? 'text-emerald-400' : 'text-red-400'">
-              <span class="w-1.5 h-1.5 rounded-full" :class="infra?.services?.ollama?.online ? 'bg-emerald-400' : 'bg-red-400'"></span>
-              <span x-text="infra?.services?.ollama?.online ? 'Ready' : 'Offline'"></span>
-            </span>
+
+        <!-- Chronological Conversation Sessions List -->
+        <div class="flex-1 overflow-y-auto space-y-3 pr-1 pt-2 border-t border-[#1E1E22]">
+          
+          <!-- Today -->
+          <div x-show="groupedSessions.today.length > 0">
+            <div class="px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">Today</div>
+            <div class="space-y-0.5 mt-1">
+              <template x-for="s in groupedSessions.today" :key="s.session_id">
+                <div class="group relative rounded-md transition flex items-center"
+                     :class="currentSessionId === s.session_id ? 'bg-[#18181B] text-white border border-[#27272A]' : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#121215]'">
+                  <button @click="switchSession(s.session_id)" class="w-full text-left px-2.5 py-1.5 text-xs truncate pr-12">
+                    <span x-text="s.title"></span>
+                  </button>
+                  <div class="absolute right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                    <button @click.stop="renameSessionPrompt(s.session_id, s.title)" class="p-1 text-zinc-500 hover:text-zinc-200 text-[10px]" title="Rename"><i class="fa-solid fa-pen"></i></button>
+                    <button @click.stop="deleteSession(s.session_id)" class="p-1 text-zinc-500 hover:text-rose-400 text-[10px]" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
+                  </div>
+                </div>
+              </template>
+            </div>
           </div>
-          <div class="flex items-center justify-between">
-            <span class="text-zinc-400">Elasticsearch</span>
-            <span class="flex items-center gap-1 font-mono" :class="infra?.services?.elasticsearch?.online ? 'text-emerald-400' : 'text-red-400'">
-              <span class="w-1.5 h-1.5 rounded-full" :class="infra?.services?.elasticsearch?.online ? 'bg-emerald-400' : 'bg-red-400'"></span>
-              <span x-text="infra?.services?.elasticsearch?.online ? 'Ready' : 'Offline'"></span>
-            </span>
+
+          <!-- Yesterday -->
+          <div x-show="groupedSessions.yesterday.length > 0">
+            <div class="px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">Yesterday</div>
+            <div class="space-y-0.5 mt-1">
+              <template x-for="s in groupedSessions.yesterday" :key="s.session_id">
+                <div class="group relative rounded-md transition flex items-center"
+                     :class="currentSessionId === s.session_id ? 'bg-[#18181B] text-white border border-[#27272A]' : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#121215]'">
+                  <button @click="switchSession(s.session_id)" class="w-full text-left px-2.5 py-1.5 text-xs truncate pr-12">
+                    <span x-text="s.title"></span>
+                  </button>
+                  <div class="absolute right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                    <button @click.stop="renameSessionPrompt(s.session_id, s.title)" class="p-1 text-zinc-500 hover:text-zinc-200 text-[10px]" title="Rename"><i class="fa-solid fa-pen"></i></button>
+                    <button @click.stop="deleteSession(s.session_id)" class="p-1 text-zinc-500 hover:text-rose-400 text-[10px]" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
+                  </div>
+                </div>
+              </template>
+            </div>
           </div>
-          <div class="flex items-center justify-between">
-            <span class="text-zinc-400">SearXNG</span>
-            <span class="flex items-center gap-1 font-mono" :class="infra?.services?.searxng?.online ? 'text-emerald-400' : 'text-red-400'">
-              <span class="w-1.5 h-1.5 rounded-full" :class="infra?.services?.searxng?.online ? 'bg-emerald-400' : 'bg-red-400'"></span>
-              <span x-text="infra?.services?.searxng?.online ? 'Ready' : 'Offline'"></span>
-            </span>
+
+          <!-- Previous 7 Days -->
+          <div x-show="groupedSessions.week.length > 0">
+            <div class="px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">Previous 7 Days</div>
+            <div class="space-y-0.5 mt-1">
+              <template x-for="s in groupedSessions.week" :key="s.session_id">
+                <div class="group relative rounded-md transition flex items-center"
+                     :class="currentSessionId === s.session_id ? 'bg-[#18181B] text-white border border-[#27272A]' : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#121215]'">
+                  <button @click="switchSession(s.session_id)" class="w-full text-left px-2.5 py-1.5 text-xs truncate pr-12">
+                    <span x-text="s.title"></span>
+                  </button>
+                  <div class="absolute right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                    <button @click.stop="renameSessionPrompt(s.session_id, s.title)" class="p-1 text-zinc-500 hover:text-zinc-200 text-[10px]" title="Rename"><i class="fa-solid fa-pen"></i></button>
+                    <button @click.stop="deleteSession(s.session_id)" class="p-1 text-zinc-500 hover:text-rose-400 text-[10px]" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Older -->
+          <div x-show="groupedSessions.older.length > 0">
+            <div class="px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">Older</div>
+            <div class="space-y-0.5 mt-1">
+              <template x-for="s in groupedSessions.older" :key="s.session_id">
+                <div class="group relative rounded-md transition flex items-center"
+                     :class="currentSessionId === s.session_id ? 'bg-[#18181B] text-white border border-[#27272A]' : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#121215]'">
+                  <button @click="switchSession(s.session_id)" class="w-full text-left px-2.5 py-1.5 text-xs truncate pr-12">
+                    <span x-text="s.title"></span>
+                  </button>
+                  <div class="absolute right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                    <button @click.stop="renameSessionPrompt(s.session_id, s.title)" class="p-1 text-zinc-500 hover:text-zinc-200 text-[10px]" title="Rename"><i class="fa-solid fa-pen"></i></button>
+                    <button @click.stop="deleteSession(s.session_id)" class="p-1 text-zinc-500 hover:text-rose-400 text-[10px]" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div x-show="sessions.length === 0" class="p-4 text-center text-xs text-zinc-600">
+            No previous conversations.
           </div>
         </div>
+
+      </div>
+
+      <!-- Footer: Compact Model Profile -->
+      <div class="pt-3 border-t border-[#1E1E22] flex items-center justify-between">
+        <button @click="openSystemHub()" class="flex items-center gap-2 text-left group overflow-hidden">
+          <div class="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></div>
+          <div class="truncate">
+            <div class="text-[11px] font-mono text-zinc-300 group-hover:text-indigo-400 truncate" x-text="formatModelName(status.model_name)"></div>
+            <div class="text-[10px] text-zinc-500">Ollama Local Engine</div>
+          </div>
+        </button>
+        <button @click="sidebarCollapsed = true" class="p-1.5 text-zinc-500 hover:text-zinc-300 rounded" title="Collapse Sidebar">
+          <i class="fa-solid fa-chevron-left text-xs"></i>
+        </button>
       </div>
     </aside>
 
-    <!-- Center Stage: Multi-Tab Views -->
-    <main class="flex-1 flex bg-zinc-950 overflow-hidden relative">
+    <!-- Sidebar Expand Trigger (if collapsed) -->
+    <button x-show="sidebarCollapsed" @click="sidebarCollapsed = false"
+      class="absolute left-3 top-3 z-30 p-2 rounded-lg bg-[#18181B] border border-[#27272A] text-zinc-400 hover:text-white shadow-lg transition">
+      <i class="fa-solid fa-bars text-xs"></i>
+    </button>
 
-      <!-- =============================================================== -->
-      <!-- VIEW 1: ASSISTANT CHAT + DEDICATED DIALOGUE DRAWERS PANEL        -->
-      <!-- =============================================================== -->
-      <div x-show="activeTab === 'chat'" class="flex-1 flex h-full overflow-hidden">
+    <!-- =================================================================== -->
+    <!-- CENTER STAGE: EXECUTIVE CANVAS                                      -->
+    <!-- =================================================================== -->
+    <main class="flex-1 flex flex-col h-full overflow-hidden bg-[#09090B] relative">
+      
+      <!-- Chat Stream Viewport -->
+      <div class="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6" id="chatViewport">
         
-        <!-- DIALOGUE DRAWERS PANEL (Beside the chat, fixed height, independent scroll) -->
-        <div class="w-64 border-r border-zinc-800/80 bg-zinc-950/70 flex flex-col shrink-0 h-full select-none">
-          <!-- Drawer Header -->
-          <div class="p-3 border-b border-zinc-800/80 flex items-center justify-between shrink-0">
-            <div class="flex items-center gap-1.5">
-              <i class="fa-solid fa-box-archive text-xs text-teal-400"></i>
-              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-300">Dialogue Drawers</span>
-            </div>
-            <button @click="startNewSession()" title="Start New Session" class="px-2 py-1 bg-teal-600/20 hover:bg-teal-600/30 text-teal-300 border border-teal-500/40 rounded text-[11px] font-medium transition flex items-center gap-1">
-              <i class="fa-solid fa-plus text-[9px]"></i> New
-            </button>
-          </div>
+        <!-- Clean Empty State Hero -->
+        <div x-show="chatMessages.length === 0" class="max-w-2xl mx-auto text-center py-16 animate-fade-in">
+          <img src="/static/logo.svg" alt="Argus OS" class="w-12 h-12 mx-auto mb-4 object-contain">
+          <h1 class="text-xl font-semibold text-white tracking-tight">Argus Executive Copilot</h1>
+          <p class="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed mt-1.5 mb-6">
+            Autonomous multi-agent operating system. Decomposing complex goals into verifiable steps across email, document intelligence, and live knowledge.
+          </p>
 
-          <!-- Sessions List (Independent vertical scroll) -->
-          <div class="flex-1 overflow-y-auto p-2 space-y-1">
-            <template x-for="s in sessions" :key="s.session_id">
-              <div class="group relative rounded-md transition"
-                :class="currentSessionId === s.session_id ? 'bg-zinc-850 border border-zinc-700/80' : 'hover:bg-zinc-900 border border-transparent'">
-                <button @click="switchSession(s.session_id)" class="w-full text-left px-2.5 py-2 flex flex-col">
-                  <div class="flex items-center justify-between w-full">
-                    <span class="truncate font-mono text-[11px] font-medium"
-                      :class="currentSessionId === s.session_id ? 'text-teal-300' : 'text-zinc-300'"
-                      x-text="s.session_id"></span>
-                    <span class="text-[10px] text-zinc-500 px-1 rounded bg-zinc-800 shrink-0 ml-1" x-text="s.turn_count + ' turns'"></span>
-                  </div>
-                  <span class="text-[10px] text-zinc-500 mt-0.5" x-text="s.last_updated ? formatTime(s.last_updated) : 'MemPalace Drawer'"></span>
-                </button>
-                <!-- Delete Turn Button -->
-                <button @click.stop="clearCurrentSession(s.session_id)" title="Clear Session" class="absolute right-2 top-2 p-1 text-zinc-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition">
-                  <i class="fa-solid fa-trash-can text-[10px]"></i>
-                </button>
+          <!-- Prompt Starter Chips -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-xl mx-auto text-left">
+            <button @click="sendMessage('Organize my recent vendor invoice emails and synthesize total spend into an executive summary table')"
+              class="p-3 rounded-lg bg-[#121215] border border-[#27272A] hover:border-indigo-500/40 transition group">
+              <div class="text-xs font-semibold text-zinc-200 group-hover:text-indigo-300 flex items-center gap-1.5">
+                <i class="fa-solid fa-file-invoice text-[11px] text-indigo-400"></i>
+                <span>Invoice Triage & Spend Analysis</span>
               </div>
-            </template>
-            <div x-show="sessions.length === 0" class="p-4 text-center text-xs text-zinc-500">
-              No previous drawers. Start a conversation!
-            </div>
-          </div>
+              <div class="text-[11px] text-zinc-500 mt-1 leading-normal">IMAP search, attachment download, TableFormer extraction.</div>
+            </button>
 
-          <!-- Bottom Drawer Controls -->
-          <div class="p-3 border-t border-zinc-800/80 shrink-0 bg-zinc-950">
-            <button @click="clearCurrentSession(currentSessionId)" class="w-full py-1.5 px-2 bg-zinc-900 hover:bg-zinc-850 text-zinc-400 hover:text-rose-400 border border-zinc-800 rounded text-[11px] font-medium transition flex items-center justify-center gap-1.5">
-              <i class="fa-solid fa-broom text-[10px]"></i> Clear Active Dialogue
+            <button @click="sendMessage('Analyze recent documents in the vault and extract all key findings and strategic action items')"
+              class="p-3 rounded-lg bg-[#121215] border border-[#27272A] hover:border-cyan-500/40 transition group">
+              <div class="text-xs font-semibold text-zinc-200 group-hover:text-cyan-300 flex items-center gap-1.5">
+                <i class="fa-solid fa-file-lines text-[11px] text-cyan-400"></i>
+                <span>Document Vault Intelligence</span>
+              </div>
+              <div class="text-[11px] text-zinc-500 mt-1 leading-normal">Multimodal Docling parsing, table structure extraction.</div>
+            </button>
+
+            <button @click="sendMessage('What are my active stored beliefs, executive preferences, and recent project context?')"
+              class="p-3 rounded-lg bg-[#121215] border border-[#27272A] hover:border-purple-500/40 transition group">
+              <div class="text-xs font-semibold text-zinc-200 group-hover:text-purple-300 flex items-center gap-1.5">
+                <i class="fa-solid fa-brain text-[11px] text-purple-400"></i>
+                <span>Cognitive Beliefs & Preferences</span>
+              </div>
+              <div class="text-[11px] text-zinc-500 mt-1 leading-normal">Hindsight 4-network memory recall and belief grounding.</div>
+            </button>
+
+            <button @click="sendMessage('Conduct live web research on latest developments in autonomous multi-agent systems')"
+              class="p-3 rounded-lg bg-[#121215] border border-[#27272A] hover:border-emerald-500/40 transition group">
+              <div class="text-xs font-semibold text-zinc-200 group-hover:text-emerald-300 flex items-center gap-1.5">
+                <i class="fa-solid fa-globe text-[11px] text-emerald-400"></i>
+                <span>Market & Tech Research</span>
+              </div>
+              <div class="text-[11px] text-zinc-500 mt-1 leading-normal">Zero-cloud live SearXNG search and citation synthesis.</div>
             </button>
           </div>
         </div>
 
-        <!-- MAIN CHAT STREAM (Independent scroll, fills remaining width) -->
-        <div class="flex-1 flex flex-col h-full overflow-hidden bg-zinc-950">
-          
-          <!-- Chat Top Indicator Bar -->
-          <div class="h-10 px-5 border-b border-zinc-900 flex items-center justify-between text-xs text-zinc-400 shrink-0 bg-zinc-950/40">
-            <div class="flex items-center gap-2">
-              <span class="font-mono text-zinc-500">Drawer:</span>
-              <span class="font-mono text-teal-400 font-medium" x-text="currentSessionId"></span>
-            </div>
-            <div class="flex items-center gap-3">
-              <span class="text-[11px] text-zinc-500" x-text="chatMessages.length + ' messages in context'"></span>
-              <span class="w-1 h-1 rounded-full bg-zinc-700"></span>
-              <span class="text-[11px] text-zinc-400 font-mono" x-text="formatModelName(status.model_name)"></span>
-            </div>
-          </div>
-
-          <!-- Messages Stream -->
-          <div class="flex-1 overflow-y-auto p-6 space-y-6" id="chatStream">
+        <!-- Messages Stream -->
+        <template x-for="(msg, idx) in chatMessages" :key="idx">
+          <div class="max-w-4xl mx-auto flex gap-3 animate-fade-in" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
             
-            <!-- Clean Empty State Hero (if no messages) -->
-            <div x-show="chatMessages.length === 0" class="max-w-2xl mx-auto text-center py-16">
-              <div class="w-12 h-12 rounded-xl bg-teal-600/10 border border-teal-500/30 text-teal-400 flex items-center justify-center mx-auto mb-4 text-xl">
-                <i class="fa-solid fa-compass"></i>
-              </div>
-              <h2 class="text-xl font-semibold text-white mb-2">WorkOS Executive Copilot</h2>
-              <p class="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed mb-6">
-                Autonomous executive AI operating system. Grounded in your 4-Network Memory Palace, 12K context window, and autonomous specialist agents.
-              </p>
-
-              <!-- Quick Action Prompt Chips -->
-              <div class="flex flex-wrap items-center justify-center gap-2 max-w-lg mx-auto">
-                <button @click="sendQuickPrompt('Organize all my recent invoice and billing emails into Invoices with subfolders by vendor')" class="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-teal-500/40 rounded-full text-xs text-zinc-300 transition flex items-center gap-1.5">
-                  📬 <span>Organize Invoices & Billing</span>
-                </button>
-                <button @click="sendQuickPrompt('Analyze recent documents in the vault and synthesize key takeaways and action items')" class="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 rounded-full text-xs text-zinc-300 transition">
-                  📄 <span>Document Intelligence</span>
-                </button>
-                <button @click="sendQuickPrompt('What are my active preferences, stored beliefs, and recent project context?')" class="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 rounded-full text-xs text-zinc-300 transition">
-                  🧠 <span>Active Memory & Beliefs</span>
-                </button>
-                <button @click="sendQuickPrompt('Conduct deep web research on latest advancements in autonomous multi-agent systems')" class="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 rounded-full text-xs text-zinc-300 transition">
-                  🌐 <span>Market & Tech Research</span>
-                </button>
-              </div>
+            <!-- Assistant Avatar -->
+            <div x-show="msg.role === 'assistant'" class="w-7 h-7 rounded-lg bg-[#18181B] border border-[#27272A] flex items-center justify-center shrink-0 mt-0.5">
+              <img src="/static/logo.svg" alt="Argus" class="w-4 h-4 object-contain">
             </div>
 
-            <!-- Messages List -->
-            <template x-for="(msg, idx) in chatMessages" :key="idx">
-              <div class="max-w-3xl mx-auto flex gap-3" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
-                
-                <!-- Assistant Avatar -->
-                <div x-show="msg.role === 'assistant'" class="w-7 h-7 rounded bg-teal-600/20 border border-teal-500/40 text-teal-400 flex items-center justify-center text-xs shrink-0 mt-0.5">
-                  <i class="fa-solid fa-robot"></i>
+            <!-- Message Card -->
+            <div class="max-w-[85%] rounded-xl p-4 shadow-sm relative select-text"
+              :class="msg.role === 'user' ? 'bg-[#14141A] border border-[#2A2A38] text-zinc-100' : 'bg-[#121215] border border-[#27272A] text-zinc-200'">
+              
+              <!-- Message Header Bar -->
+              <div class="flex items-center justify-between gap-4 mb-2 text-[10px] font-mono text-zinc-500 pb-1.5 border-b border-[#1E1E22]">
+                <span class="uppercase tracking-wider font-semibold"
+                  :class="msg.role === 'user' ? 'text-indigo-400' : 'text-zinc-400'"
+                  x-text="msg.role === 'user' ? 'Executive' : 'Argus OS'"></span>
+                <div class="flex items-center gap-2">
+                  <span x-show="msg.duration_ms" class="text-indigo-400 font-mono" x-text="msg.duration_ms + 'ms'"></span>
+                  <span x-text="formatTime(msg.timestamp)"></span>
+                  <button @click="copyToClipboard(msg.content)" class="hover:text-zinc-300 ml-1" title="Copy Text"><i class="fa-solid fa-copy text-[10px]"></i></button>
                 </div>
+              </div>
 
-                <!-- Message Card -->
-                <div class="max-w-[85%] rounded-lg p-4 shadow-sm"
-                  :class="msg.role === 'user' ? 'bg-teal-950/40 border border-teal-600/30 text-zinc-100' : 'bg-zinc-900/90 border border-zinc-800 text-zinc-200'">
-                  
-                  <!-- Role & Timestamp Header -->
-                  <div class="flex items-center justify-between gap-4 mb-2 text-[10px] font-mono text-zinc-500 pb-1.5 border-b border-zinc-800/60">
-                    <span class="uppercase tracking-wider font-semibold" :class="msg.role === 'user' ? 'text-teal-400' : 'text-zinc-400'" x-text="msg.role === 'user' ? 'You' : 'WorkOS Assistant'"></span>
-                    <span x-text="formatTime(msg.timestamp)"></span>
+              <!-- Prose Markdown Body -->
+              <div class="prose-argus" x-html="renderMarkdown(msg.content)"></div>
+
+              <!-- Specialist Agent Action Receipt (Replacing Raw JSON Slop) -->
+              <template x-if="msg.plan && msg.plan.steps && msg.plan.steps.length">
+                <div class="mt-4 pt-3 border-t border-[#27272A] space-y-2">
+                  <div class="flex items-center justify-between text-[11px] font-mono font-medium text-zinc-400">
+                    <span class="flex items-center gap-1.5 text-indigo-400">
+                      <i class="fa-solid fa-diagram-project text-[10px]"></i>
+                      <span x-text="msg.plan.steps.length + ' Specialist Tasks Executed'"></span>
+                    </span>
+                    <span class="text-emerald-400" x-text="msg.duration_ms ? (msg.duration_ms / 1000).toFixed(2) + 's total' : ''"></span>
                   </div>
 
-                  <!-- Markdown Content -->
-                  <div class="prose-workos select-text" x-html="renderMarkdown(msg.content)"></div>
-
-                  <!-- Embedded Specialist Plan Execution Card (if plan returned) -->
-                  <template x-if="msg.plan && msg.plan.steps && msg.plan.steps.length">
-                    <div class="mt-4 pt-3 border-t border-zinc-800 space-y-2">
-                      <div class="text-[11px] font-mono font-semibold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
-                        <span>Specialist Agents Dispatched</span>
-                        <span class="text-teal-400 font-normal" x-text="msg.plan.steps.length + ' steps'"></span>
-                      </div>
-                      <div class="space-y-1.5">
-                        <template x-for="st in msg.plan.steps" :key="st.step_id">
-                          <div class="p-2.5 rounded bg-zinc-950/80 border border-zinc-800 flex items-start justify-between gap-3 text-xs">
-                            <div>
-                              <div class="flex items-center gap-1.5 font-mono text-[11px] text-teal-400">
-                                <i class="fa-solid fa-gear text-[10px]"></i>
-                                <span x-text="st.assigned_agent"></span>
-                              </div>
-                              <div class="text-zinc-300 text-xs mt-0.5" x-text="st.description"></div>
-                            </div>
-                            <span class="px-2 py-0.5 rounded text-[10px] font-mono shrink-0"
-                              :class="st.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-zinc-800 text-zinc-400'"
-                              x-text="st.status"></span>
+                  <div class="space-y-1.5">
+                    <template x-for="st in msg.plan.steps" :key="st.step_id">
+                      <div class="p-2.5 rounded-lg bg-[#09090B] border border-[#27272A] flex items-start justify-between gap-3 text-xs">
+                        <div class="space-y-0.5">
+                          <div class="flex items-center gap-1.5 font-mono text-[11px]">
+                            <span class="px-1.5 py-0.2 rounded bg-[#18181B] text-indigo-400 font-semibold uppercase" x-text="st.assigned_agent"></span>
+                            <span x-show="st.duration_ms" class="text-zinc-500" x-text="st.duration_ms + 'ms'"></span>
                           </div>
-                        </template>
+                          <div class="text-zinc-300 text-xs" x-text="st.description"></div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono shrink-0"
+                          :class="st.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-zinc-800 text-zinc-400'"
+                          x-text="st.status"></span>
                       </div>
-                    </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Interactive Citations Footer -->
+              <template x-if="msg.citations && msg.citations.length">
+                <div class="mt-3 pt-2.5 border-t border-[#27272A] flex flex-wrap items-center gap-1.5">
+                  <span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mr-1">Sources:</span>
+                  <template x-for="cit in msg.citations" :key="cit.citation_id">
+                    <button @click="cit.url?.startsWith('/api/vault') ? openDocViewer(cit.url.split('/')[3]) : (cit.url ? window.open(cit.url, '_blank') : null)"
+                      class="inline-flex items-center gap-1 px-2 py-1 rounded bg-[#18181B] hover:bg-[#222227] border border-[#27272A] hover:border-indigo-500/40 text-[11px] font-mono text-zinc-300 transition">
+                      <span class="text-indigo-400 font-semibold" x-text="cit.citation_id"></span>
+                      <span class="truncate max-w-[140px]" x-text="cit.title || cit.filename"></span>
+                    </button>
                   </template>
                 </div>
+              </template>
 
-                <!-- User Avatar -->
-                <div x-show="msg.role === 'user'" class="w-7 h-7 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 flex items-center justify-center text-xs shrink-0 mt-0.5">
-                  <i class="fa-solid fa-user"></i>
-                </div>
-              </div>
-            </template>
-
-            <!-- Thinking Indicator -->
-            <div x-show="isThinking" class="max-w-3xl mx-auto flex gap-3 items-center">
-              <div class="w-7 h-7 rounded bg-teal-600/20 border border-teal-500/40 text-teal-400 flex items-center justify-center text-xs shrink-0">
-                <i class="fa-solid fa-circle-notch animate-spin"></i>
-              </div>
-              <div class="px-4 py-2 rounded-md bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 flex items-center gap-2">
-                <span x-text="thinkingStatus"></span>
-                <span class="flex gap-1">
-                  <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span>
-                  <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse delay-100"></span>
-                  <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse delay-200"></span>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Fixed Bottom Input Composer -->
-          <div class="p-4 border-t border-zinc-800/80 bg-zinc-950 shrink-0">
-            <div class="max-w-3xl mx-auto">
-              <form @submit.prevent="sendMessage()" class="relative rounded-lg border border-zinc-800 bg-zinc-900 focus-within:border-teal-500/60 focus-within:ring-1 focus-within:ring-teal-500/30 transition shadow-lg">
-                <textarea
-                  x-model="chatInput"
-                  @keydown.enter.prevent="if (!$event.shiftKey) sendMessage()"
-                  placeholder="Ask your WorkOS executive assistant or instruct specialist agents (e.g. 'Organize vendor receipts by company')..."
-                  rows="2"
-                  class="w-full bg-transparent p-3 pr-24 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none resize-none"
-                ></textarea>
-
-                <div class="absolute right-2.5 bottom-2.5 flex items-center gap-1.5">
-                  <button type="submit" :disabled="!chatInput.trim() || isThinking"
-                    class="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-30 disabled:hover:bg-teal-600 text-white rounded text-xs font-medium transition flex items-center gap-1.5">
-                    <span>Send</span>
-                    <i class="fa-solid fa-arrow-up text-[10px]"></i>
-                  </button>
-                </div>
-              </form>
-              <div class="flex items-center justify-between text-[10px] text-zinc-500 mt-1.5 px-1 font-mono">
-                <span>Press Enter to send, Shift+Enter for new line</span>
-                <span>Grounding: MemPalace FTS5 + Hindsight</span>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- =============================================================== -->
-      <!-- VIEW 2: OPERATIONS DAG                                          -->
-      <!-- =============================================================== -->
-      <section x-show="activeTab === 'dag'" class="flex-1 flex flex-col p-6 overflow-y-auto">
-        <div class="max-w-4xl mx-auto w-full space-y-6">
-          <div>
-            <h1 class="text-xl font-bold text-white">Operations DAG Tracker</h1>
-            <p class="text-xs text-zinc-400 mt-1">Real-time multi-agent execution pipeline with variable propagation ($step_1.saved_path).</p>
-          </div>
-
-          <!-- DAG Execution Input -->
-          <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800 space-y-3">
-            <label class="text-xs font-mono uppercase text-zinc-400">Dispatch Multi-Agent Goal</label>
-            <div class="flex gap-2">
-              <input type="text" x-model="dagGoalInput" placeholder="e.g. Ingest vendor contracts and compile financial summary table"
-                class="flex-1 bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-teal-500">
-              <button @click="executeGoalDirect(dagGoalInput)" :disabled="!dagGoalInput.trim() || isThinking"
-                class="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white text-xs font-medium rounded transition">
-                Execute Plan
-              </button>
-            </div>
-          </div>
-
-          <!-- Execution Steps -->
-          <div x-show="currentPlan && currentPlan.steps && currentPlan.steps.length" class="space-y-4">
-            <h3 class="text-xs font-mono uppercase tracking-wider text-zinc-400">Execution Plan Steps</h3>
-            <template x-for="step in (currentPlan ? currentPlan.steps : [])" :key="step.step_id">
-              <div class="p-4 rounded-lg bg-zinc-900/90 border border-zinc-800 space-y-2">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <span class="w-6 h-6 rounded bg-zinc-800 text-zinc-300 font-mono text-xs flex items-center justify-center font-bold" x-text="step.step_id"></span>
-                    <span class="text-xs font-mono text-teal-400 font-semibold uppercase" x-text="step.assigned_agent"></span>
-                  </div>
-                  <span class="px-2 py-0.5 rounded text-[10px] font-mono"
-                    :class="step.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-zinc-800 text-zinc-400'"
-                    x-text="step.status"></span>
-                </div>
-                <div class="text-xs text-zinc-200" x-text="step.description"></div>
-                <template x-if="step.result && step.result.data">
-                  <div class="mt-2 p-2 bg-zinc-950 rounded font-mono text-[11px] text-zinc-400 overflow-x-auto max-h-40">
-                    <pre x-text="JSON.stringify(step.result.data, null, 2)"></pre>
-                  </div>
-                </template>
-              </div>
-            </template>
-          </div>
-        </div>
-      </section>
-
-      <!-- =============================================================== -->
-      <!-- VIEW 3: COGNITIVE MEMORY PALACE                                 -->
-      <!-- =============================================================== -->
-      <section x-show="activeTab === 'memory'" class="flex-1 flex flex-col p-6 overflow-y-auto">
-        <div class="max-w-4xl mx-auto w-full space-y-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <h1 class="text-xl font-bold text-white">4-Network Memory Palace</h1>
-              <p class="text-xs text-zinc-400 mt-1">Hindsight cognitive substrate indexed by spatial loci with automatic belief superseding.</p>
-            </div>
-            <button @click="searchMemory()" class="px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded text-xs text-zinc-300 transition flex items-center gap-1.5">
-              <i class="fa-solid fa-arrows-rotate text-[10px]"></i> Refresh
-            </button>
-          </div>
-
-          <!-- Search & Filter Bar -->
-          <div class="flex gap-2">
-            <input type="text" x-model="memorySearchQuery" @input.debounce.300ms="searchMemory()" placeholder="BM25 full-text search across memories..."
-              class="flex-1 bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-teal-500">
-            <select x-model="memoryNetworkFilter" @change="searchMemory()" class="bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-zinc-300 focus:outline-none">
-              <option value="all">All Networks</option>
-              <option value="facts">Facts</option>
-              <option value="beliefs">Beliefs</option>
-              <option value="experiences">Experiences</option>
-              <option value="entities">Entities</option>
-            </select>
-          </div>
-
-          <!-- Memories List -->
-          <div class="space-y-3">
-            <template x-for="item in memoryItems" :key="item.id">
-              <div class="p-4 rounded-lg bg-zinc-900/90 border border-zinc-800 space-y-2">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <span class="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold"
-                      :class="{
-                        'bg-blue-500/20 text-blue-400 border border-blue-500/30': item.network === 'facts',
-                        'bg-purple-500/20 text-purple-400 border border-purple-500/30': item.network === 'beliefs',
-                        'bg-amber-500/20 text-amber-400 border border-amber-500/30': item.network === 'experiences',
-                        'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30': item.network === 'entities'
-                      }"
-                      x-text="item.network"></span>
-                    <span class="text-xs font-mono text-zinc-400" x-text="item.wing + ' / ' + item.hall + ' / ' + item.key"></span>
-                  </div>
-                  <span class="text-[10px] text-zinc-500 font-mono" x-text="formatTime(item.created_at)"></span>
-                </div>
-                <div class="text-xs text-zinc-200 leading-relaxed" x-text="item.content"></div>
-              </div>
-            </template>
-            <div x-show="memoryItems.length === 0" class="p-8 text-center text-xs text-zinc-500">
-              No memories recorded in this network filter.
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- =============================================================== -->
-      <!-- VIEW 4: DOCUMENT VAULT                                          -->
-      <!-- =============================================================== -->
-      <section x-show="activeTab === 'vault'" class="flex-1 flex flex-col p-6 overflow-y-auto">
-        <div class="max-w-4xl mx-auto w-full space-y-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <h1 class="text-xl font-bold text-white">Document Vault & Provenance</h1>
-              <p class="text-xs text-zinc-400 mt-1">Lossless source document repository with SHA-256 deduplication and Docling extraction.</p>
-            </div>
-            <button @click="loadVault()" class="px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded text-xs text-zinc-300 transition flex items-center gap-1.5">
-              <i class="fa-solid fa-arrows-rotate text-[10px]"></i> Refresh
-            </button>
-          </div>
-
-          <!-- Documents List -->
-          <div class="space-y-3">
-            <template x-for="doc in vaultDocuments" :key="doc.doc_id">
-              <div class="p-4 rounded-lg bg-zinc-900/90 border border-zinc-800 flex items-center justify-between">
-                <div>
-                  <div class="flex items-center gap-2">
-                    <i class="fa-solid fa-file-pdf text-amber-400"></i>
-                    <span class="text-xs font-semibold text-white" x-text="doc.filename"></span>
-                  </div>
-                  <div class="text-[10px] text-zinc-400 font-mono mt-1" x-text="doc.sha256_hash ? doc.sha256_hash.substring(0, 16) + '...' : ''"></div>
-                </div>
-                <div class="flex items-center gap-3 text-xs">
-                  <span class="text-zinc-400" x-text="(doc.file_size_bytes / 1024).toFixed(1) + ' KB'"></span>
-                  <a :href="'/api/vault/' + doc.doc_id + '/file'" target="_blank" class="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-xs transition">
-                    View
-                  </a>
-                </div>
-              </div>
-            </template>
-            <div x-show="vaultDocuments.length === 0" class="p-12 text-center rounded-lg border border-dashed border-zinc-800 text-xs text-zinc-500">
-              <i class="fa-solid fa-folder-open text-2xl text-zinc-600 mb-2 block"></i>
-              Vault is completely clean. Uploaded documents will appear here.
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- =============================================================== -->
-      <!-- VIEW 5: AUTONOMOUS MAIL HUB                                     -->
-      <!-- =============================================================== -->
-      <section x-show="activeTab === 'mail'" class="flex-1 flex flex-col p-6 overflow-y-auto">
-        <div class="max-w-4xl mx-auto w-full space-y-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <h1 class="text-xl font-bold text-white">Autonomous Mail Hub</h1>
-              <p class="text-xs text-zinc-400 mt-1">IMAP triage, policy-governed subfolder sorting, and supervised drafting.</p>
-            </div>
-            <button @click="sendQuickPrompt('Categorize and organize all recent emails into labeled folders based on sender organization')" class="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded text-xs font-medium transition flex items-center gap-1.5 shadow">
-              <i class="fa-solid fa-bolt text-[10px]"></i> Run Smart Triage (~50 emails)
-            </button>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-              <div class="text-xs font-mono uppercase text-zinc-500 mb-1">IMAP Account</div>
-              <div class="text-sm font-medium text-white truncate">Connected over TLS</div>
-              <div class="text-[11px] text-emerald-400 mt-1"><i class="fa-solid fa-circle-check"></i> TLS Mailbox Active</div>
-            </div>
-            <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-              <div class="text-xs font-mono uppercase text-zinc-500 mb-1">Active Triage</div>
-              <div class="text-sm font-medium text-white">Autonomous Categorization</div>
-              <div class="text-[11px] text-zinc-400 mt-1">Clusters by organization, vendor, or project</div>
-            </div>
-            <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-              <div class="text-xs font-mono uppercase text-zinc-500 mb-1">Autonomy Mode</div>
-              <div class="text-sm font-medium text-white" x-text="status.autonomy_level"></div>
-              <div class="text-[11px] text-teal-400 mt-1">Supervised execution</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- =============================================================== -->
-      <!-- VIEW 6: DEBUG INSPECTOR & TRACE OBSERVER                         -->
-      <!-- =============================================================== -->
-      <section x-show="activeTab === 'debug'" class="flex-1 flex flex-col p-6 overflow-y-auto bg-zinc-950">
-        <div class="max-w-6xl mx-auto w-full space-y-6">
-          
-          <!-- Header & Actions -->
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
-            <div>
-              <div class="flex items-center gap-2.5">
-                <div class="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center">
-                  <i class="fa-solid fa-bug text-sm"></i>
-                </div>
-                <div>
-                  <h1 class="text-xl font-bold text-white flex items-center gap-2">
-                    <span>Debug Inspector</span>
-                    <span class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 font-mono font-normal">Real-Time</span>
-                  </h1>
-                  <p class="text-xs text-zinc-400 mt-0.5">Deep observability into LLM prompts, token generation, tool dispatch, JSON repairs, and errors.</p>
-                </div>
-              </div>
-            </div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <button @click="loadDebugEvents()" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-xs font-medium transition flex items-center gap-1.5 border border-zinc-700">
-                <i class="fa-solid fa-rotate-right text-[11px]" :class="isDebugRefreshing ? 'animate-spin' : ''"></i>
-                <span>Refresh</span>
-              </button>
-              <button @click="clearDebugEvents()" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-rose-300 rounded text-xs font-medium transition flex items-center gap-1.5 border border-zinc-700">
-                <i class="fa-solid fa-trash text-[11px]"></i>
-                <span>Clear Buffer</span>
-              </button>
-              <a href="/api/debug/download" target="_blank" class="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded text-xs font-medium transition flex items-center gap-1.5 shadow">
-                <i class="fa-solid fa-download text-[11px]"></i>
-                <span>Download Log</span>
-              </a>
-            </div>
-          </div>
-
-          <!-- Aggregate Status Metrics -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div class="bg-zinc-900/90 border border-zinc-800 rounded-lg p-3">
-              <div class="text-[11px] font-mono uppercase text-zinc-500">Buffered Events</div>
-              <div class="text-xl font-bold font-mono text-white mt-0.5" x-text="debugSummary?.total_events || 0"></div>
-            </div>
-            <div class="bg-zinc-900/90 border border-zinc-800 rounded-lg p-3">
-              <div class="text-[11px] font-mono uppercase text-zinc-500">Errors Detected</div>
-              <div class="text-xl font-bold font-mono mt-0.5" :class="debugSummary?.error_count > 0 ? 'text-rose-400' : 'text-emerald-400'" x-text="debugSummary?.error_count || 0"></div>
-            </div>
-            <div class="bg-zinc-900/90 border border-zinc-800 rounded-lg p-3">
-              <div class="text-[11px] font-mono uppercase text-zinc-500">LLM Inferences</div>
-              <div class="text-xl font-bold font-mono text-purple-400 mt-0.5" x-text="(debugSummary?.type_counts?.LLM_PROMPT || 0)"></div>
-            </div>
-            <div class="bg-zinc-900/90 border border-zinc-800 rounded-lg p-3">
-              <div class="text-[11px] font-mono uppercase text-zinc-500">JSON Parses</div>
-              <div class="text-xl font-bold font-mono text-cyan-400 mt-0.5" x-text="(debugSummary?.type_counts?.JSON_PARSE || 0)"></div>
-            </div>
-          </div>
-
-          <!-- Filter & Search Toolbar -->
-          <div class="bg-zinc-900/60 border border-zinc-800 rounded-lg p-3 flex flex-col md:flex-row items-center gap-3 justify-between">
-            <div class="flex items-center gap-2 flex-wrap w-full md:w-auto">
-              <span class="text-xs text-zinc-400 font-medium">Filter:</span>
-              <button @click="debugFilterType = 'all'; loadDebugEvents()" class="px-2.5 py-1 rounded text-xs font-mono transition"
-                :class="debugFilterType === 'all' ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'">All</button>
-              <button @click="debugFilterType = 'LLM_PROMPT'; loadDebugEvents()" class="px-2.5 py-1 rounded text-xs font-mono transition"
-                :class="debugFilterType === 'LLM_PROMPT' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'">Prompts</button>
-              <button @click="debugFilterType = 'LLM_RESPONSE'; loadDebugEvents()" class="px-2.5 py-1 rounded text-xs font-mono transition"
-                :class="debugFilterType === 'LLM_RESPONSE' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'">Outputs</button>
-              <button @click="debugFilterType = 'JSON_PARSE'; loadDebugEvents()" class="px-2.5 py-1 rounded text-xs font-mono transition"
-                :class="debugFilterType === 'JSON_PARSE' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'">JSON</button>
-              <button @click="debugFilterType = 'TOOL_CALL'; loadDebugEvents()" class="px-2.5 py-1 rounded text-xs font-mono transition"
-                :class="debugFilterType === 'TOOL_CALL' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'">Tools</button>
-              <button @click="debugFilterLevel = debugFilterLevel === 'ERROR' ? 'all' : 'ERROR'; loadDebugEvents()" class="px-2.5 py-1 rounded text-xs font-mono transition"
-                :class="debugFilterLevel === 'ERROR' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'">Errors Only</button>
-            </div>
-            
-            <div class="relative w-full md:w-64">
-              <input type="text" x-model="debugSearchQuery" @input.debounce.300ms="loadDebugEvents()" placeholder="Search traces..."
-                class="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-1.5 pl-8 text-xs text-white focus:outline-none focus:border-teal-500 font-mono">
-              <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-zinc-500 text-[11px]"></i>
-            </div>
-          </div>
-
-          <!-- Trace Event Stream -->
-          <div class="space-y-2">
-            <template x-if="debugEvents.length === 0">
-              <div class="p-8 text-center bg-zinc-900/40 border border-zinc-800 rounded-lg text-zinc-500 text-xs font-mono">
-                No debug events matching filters. System operations will appear here in real-time.
-              </div>
-            </template>
-
-            <template x-for="ev in debugEvents" :key="ev.id">
-              <div class="bg-zinc-900 border rounded-lg overflow-hidden transition"
-                :class="ev.level === 'ERROR' ? 'border-rose-900/60 bg-rose-950/10' : ev.level === 'WARNING' ? 'border-amber-900/50 bg-amber-950/10' : 'border-zinc-800/80 hover:border-zinc-700'">
-                
-                <!-- Event Header Bar -->
-                <div @click="toggleEventExpand(ev.id)" class="p-3 flex items-center justify-between cursor-pointer select-none">
-                  <div class="flex items-center gap-2.5 flex-wrap">
-                    <!-- Level Badge -->
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase"
-                      :class="ev.level === 'ERROR' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : ev.level === 'WARNING' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-zinc-800 text-zinc-400'"
-                      x-text="ev.level"></span>
-
-                    <!-- Event Type Badge -->
-                    <span class="px-2 py-0.5 rounded text-[10px] font-mono"
-                      :class="{
-                        'bg-purple-950/60 text-purple-300 border border-purple-800/50': ev.event_type === 'LLM_PROMPT',
-                        'bg-blue-950/60 text-blue-300 border border-blue-800/50': ev.event_type === 'LLM_RESPONSE',
-                        'bg-cyan-950/60 text-cyan-300 border border-cyan-800/50': ev.event_type === 'JSON_PARSE',
-                        'bg-teal-950/60 text-teal-300 border border-teal-800/50': ev.event_type === 'PLAN_FORMULATED',
-                        'bg-emerald-950/60 text-emerald-300 border border-emerald-800/50': ev.event_type === 'TOOL_CALL' || ev.event_type === 'TOOL_RESULT',
-                        'bg-rose-950/60 text-rose-300 border border-rose-800/50': ev.event_type === 'SYSTEM_ERROR',
-                        'bg-zinc-800 text-zinc-300': !['LLM_PROMPT','LLM_RESPONSE','JSON_PARSE','PLAN_FORMULATED','TOOL_CALL','TOOL_RESULT','SYSTEM_ERROR'].includes(ev.event_type)
-                      }"
-                      x-text="ev.event_type"></span>
-
-                    <!-- Component -->
-                    <span class="text-xs font-mono font-semibold text-zinc-300" x-text="ev.component"></span>
-
-                    <!-- Message -->
-                    <span class="text-xs text-zinc-200" x-text="ev.message"></span>
-                  </div>
-
-                  <div class="flex items-center gap-3 text-[11px] font-mono text-zinc-500 shrink-0">
-                    <span x-show="ev.duration_ms !== null" class="text-teal-400" x-text="ev.duration_ms + 'ms'"></span>
-                    <span x-text="ev.timestamp.split('T')[1]?.substring(0, 8)"></span>
-                    <i class="fa-solid fa-chevron-down transition text-xs" :class="debugExpandedEventId === ev.id ? 'rotate-180 text-teal-400' : 'text-zinc-600'"></i>
-                  </div>
-                </div>
-
-                <!-- Expanded Event Details & Payloads -->
-                <div x-show="debugExpandedEventId === ev.id" x-collapse class="px-4 pb-4 pt-1 border-t border-zinc-800/60 bg-zinc-950/80 space-y-3">
-                  <div class="flex items-center justify-between text-[11px] text-zinc-500 font-mono">
-                    <span>Event ID: <span class="text-zinc-300" x-text="ev.id"></span></span>
-                    <span x-show="ev.session_id">Session: <span class="text-zinc-300" x-text="ev.session_id"></span></span>
-                    <button @click.stop="copyToClipboard(JSON.stringify(ev, null, 2))" class="text-teal-400 hover:text-teal-300 flex items-center gap-1">
-                      <i class="fa-solid fa-copy text-[10px]"></i> Copy JSON
-                    </button>
-                  </div>
-
-                  <!-- Error message if present -->
-                  <div x-show="ev.error" class="p-3 bg-rose-950/30 border border-rose-800/50 rounded text-xs text-rose-300 font-mono overflow-x-auto whitespace-pre-wrap" x-text="ev.error"></div>
-
-                  <!-- Payload JSON -->
-                  <div x-show="Object.keys(ev.payload || {}).length > 0">
-                    <div class="text-[10px] font-mono uppercase text-zinc-500 mb-1">Payload Content:</div>
-                    <pre class="bg-zinc-900 border border-zinc-800 rounded p-3 text-[11px] font-mono text-zinc-300 overflow-x-auto max-h-96 leading-relaxed whitespace-pre-wrap" x-text="JSON.stringify(ev.payload, null, 2)"></pre>
-                  </div>
-                </div>
-
-              </div>
-            </template>
-          </div>
-
-        </div>
-      </section>
-
-    </main>
-  </div>
-
-  <!-- ================================================================= -->
-  <!-- MODEL SWITCHER MODAL                                              -->
-  <!-- ================================================================= -->
-  <div x-show="showModelModal" @keydown.escape.window="showModelModal = false" x-transition.opacity
-    class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div @click.away="showModelModal = false" class="bg-zinc-900 border border-zinc-700/80 rounded-xl max-w-xl w-full p-6 shadow-2xl space-y-5">
-      
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
-        <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-teal-500/20 border border-teal-500/40 text-teal-400 flex items-center justify-center">
-            <i class="fa-solid fa-microchip"></i>
-          </div>
-          <div>
-            <h3 class="text-base font-semibold text-white">Select Inference Model</h3>
-            <p class="text-xs text-zinc-400">All models run 100% locally on Ollama using your GTX 1650 GPU.</p>
-          </div>
-        </div>
-        <button @click="showModelModal = false" class="text-zinc-500 hover:text-zinc-200">
-          <i class="fa-solid fa-xmark text-sm"></i>
-        </button>
-      </div>
-
-      <!-- Models List -->
-      <div class="space-y-3">
-        <template x-for="m in detailedModels" :key="m.id">
-          <div @click="switchModel(m.id)"
-            class="p-4 rounded-lg border cursor-pointer transition-all flex items-start justify-between gap-4"
-            :class="status.model_name === m.id || (m.recommended && status.model_name.includes('refinedtoolcall'))
-              ? 'bg-teal-950/30 border-teal-500/80 ring-1 ring-teal-500/40'
-              : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850/40'">
-            
-            <div class="space-y-1">
-              <div class="flex items-center gap-2">
-                <span class="text-sm font-semibold text-white" x-text="m.name"></span>
-                <span x-show="m.recommended" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/40">
-                  ★ Recommended
-                </span>
-                <span x-show="status.model_name === m.id || (m.recommended && status.model_name.includes('refinedtoolcall'))"
-                  class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                  Active
-                </span>
-              </div>
-              <div class="text-xs text-zinc-300 font-mono" x-text="m.tag"></div>
-              <div class="text-[11px] text-zinc-400 flex items-center gap-3 pt-1">
-                <span><i class="fa-solid fa-database text-[10px] mr-1 text-zinc-500"></i><span x-text="m.context"></span></span>
-                <span><i class="fa-solid fa-sliders text-[10px] mr-1 text-zinc-500"></i>Temp 0.6 • Top-P 0.95</span>
-              </div>
             </div>
 
-            <div class="shrink-0 mt-1">
-              <div class="w-5 h-5 rounded-full border flex items-center justify-center transition"
-                :class="status.model_name === m.id || (m.recommended && status.model_name.includes('refinedtoolcall'))
-                  ? 'border-teal-400 bg-teal-500 text-zinc-950 font-bold text-xs'
-                  : 'border-zinc-700 bg-zinc-900'">
-                <i class="fa-solid fa-check text-[10px]" x-show="status.model_name === m.id || (m.recommended && status.model_name.includes('refinedtoolcall'))"></i>
-              </div>
+            <!-- User Avatar -->
+            <div x-show="msg.role === 'user'" class="w-7 h-7 rounded-lg bg-[#18181B] border border-[#27272A] text-zinc-400 flex items-center justify-center shrink-0 mt-0.5 text-xs">
+              <i class="fa-solid fa-user"></i>
             </div>
           </div>
         </template>
+
+        <!-- LIVE SUBAGENT MISSION CONTROL ("PEEK BEHIND THE CURTAIN") -->
+        <div x-show="isThinking" class="max-w-4xl mx-auto space-y-3 animate-fade-in">
+          
+          <div class="p-3.5 rounded-xl bg-[#121215] border border-indigo-500/30 shadow-lg space-y-2.5">
+            <!-- Active Mission Status Line -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2 text-xs">
+                <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse-glow"></span>
+                <span class="font-mono text-indigo-300 font-medium" x-text="thinkingTicker"></span>
+              </div>
+              
+              <!-- Peek Inside Toggle Button -->
+              <button @click="peekInsideOpen = !peekInsideOpen"
+                class="px-2 py-1 rounded bg-[#18181B] hover:bg-[#222227] border border-[#27272A] text-[10px] font-mono text-cyan-300 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-terminal text-[9px]"></i>
+                <span x-text="peekInsideOpen ? 'Hide Subagent Activity' : 'Peek Behind the Curtain'"></span>
+                <i class="fa-solid fa-chevron-down text-[8px] transition-transform" :class="peekInsideOpen ? 'rotate-180' : ''"></i>
+              </button>
+            </div>
+
+            <!-- Expandable Live SSE Subagent Event Stream -->
+            <div x-show="peekInsideOpen" x-collapse class="pt-2 border-t border-[#27272A] space-y-1.5 max-h-48 overflow-y-auto">
+              <template x-for="ev in liveEvents" :key="ev.id">
+                <div class="px-2.5 py-1.5 rounded bg-[#09090B] border border-[#1E1E22] flex items-center justify-between text-[11px] font-mono">
+                  <div class="flex items-center gap-2 truncate">
+                    <span class="text-zinc-500 text-[10px]" x-text="ev.timestamp"></span>
+                    <span class="px-1.5 py-0.2 rounded bg-indigo-950/60 text-indigo-300 text-[9px] uppercase" x-text="ev.component"></span>
+                    <span class="text-zinc-300 truncate" x-text="ev.message"></span>
+                  </div>
+                  <span x-show="ev.duration_ms" class="text-cyan-400 text-[10px] shrink-0 ml-2" x-text="ev.duration_ms + 'ms'"></span>
+                </div>
+              </template>
+              <div x-show="liveEvents.length === 0" class="text-center py-2 text-zinc-600 font-mono text-[10px]">
+                Subagent thought stream initializing...
+              </div>
+            </div>
+          </div>
+
+        </div>
+
       </div>
 
-      <!-- Modal Footer -->
-      <div class="pt-3 border-t border-zinc-800 flex items-center justify-between text-xs text-zinc-400">
-        <span>Context window allocated: <strong class="text-teal-400" x-text="((status.num_ctx || 12288)).toLocaleString() + ' tokens (12K)'">12,288 tokens (12K)</strong></span>
-        <button @click="showModelModal = false" class="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded text-xs font-medium transition">
-          Done
-        </button>
+      <!-- Upload Feedback Banner -->
+      <div x-show="uploadFeedback" class="px-4 py-2 bg-indigo-950/80 border-t border-indigo-500/30 text-indigo-300 text-xs font-mono flex items-center justify-between shrink-0">
+        <span x-text="uploadFeedback"></span>
+        <button @click="uploadFeedback = null" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
+      <!-- Floating Bottom Input Composer -->
+      <div class="p-4 border-t border-[#27272A] bg-[#09090B] shrink-0">
+        <div class="max-w-4xl mx-auto">
+          <form @submit.prevent="sendMessage()" class="relative rounded-xl border border-[#27272A] bg-[#121215] focus-within:border-indigo-500/60 focus-within:ring-1 focus-within:ring-indigo-500/30 transition shadow-xl">
+            
+            <textarea
+              id="chatInputComposer"
+              x-model="chatInput"
+              @keydown.enter.prevent="if (!$event.shiftKey) sendMessage()"
+              placeholder="Instruct Argus OS or specialist subagents (e.g. 'Extract tables from uploaded invoices and summarize spend')..."
+              rows="2"
+              class="w-full bg-transparent p-3 pr-28 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none resize-none leading-relaxed"
+            ></textarea>
+
+            <!-- Bottom Composer Action Toolbar -->
+            <div class="flex items-center justify-between px-3 pb-2.5 pt-1 text-xs text-zinc-400">
+              
+              <!-- Attachment & Prompt Pills -->
+              <div class="flex items-center gap-2">
+                <label class="cursor-pointer hover:text-zinc-200 flex items-center gap-1 text-[11px] p-1 rounded hover:bg-[#18181B] transition" title="Upload Document to Vault">
+                  <i class="fa-solid fa-paperclip text-xs"></i>
+                  <input type="file" class="hidden" @change="handleFileUpload($event)" accept=".pdf,.docx,.txt,.csv,.md">
+                  <span class="hidden sm:inline">Attach</span>
+                </label>
+                <button type="button" @click="chatInput = 'Conduct deep web research on: '" class="hidden sm:inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-[#18181B] hover:bg-[#222227] text-zinc-400 hover:text-zinc-200 border border-[#27272A]">
+                  <i class="fa-solid fa-globe text-[10px] text-emerald-400"></i> Research
+                </button>
+                <button type="button" @click="chatInput = 'Extract and structure financial tables from: '" class="hidden sm:inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-[#18181B] hover:bg-[#222227] text-zinc-400 hover:text-zinc-200 border border-[#27272A]">
+                  <i class="fa-solid fa-table text-[10px] text-cyan-400"></i> Tables
+                </button>
+              </div>
+
+              <!-- Send Action Button -->
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] text-zinc-500 font-mono hidden md:inline">Enter to send, Shift+Enter for newline</span>
+                <button type="submit" :disabled="!chatInput.trim() || isThinking"
+                  class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:hover:bg-indigo-600 text-white rounded-lg text-xs font-medium transition flex items-center gap-1.5 shadow">
+                  <span>Send</span>
+                  <i class="fa-solid fa-arrow-up text-[10px]"></i>
+                </button>
+              </div>
+
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- =================================================================== -->
+    <!-- CONTEXTUAL SLIDE-OVER DRAWER (Right, 460px)                         -->
+    <!-- =================================================================== -->
+    <div x-show="drawerOpen" x-cloak class="fixed inset-0 z-40 overflow-hidden select-text">
+      <!-- Backdrop Overlay -->
+      <div class="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" @click="drawerOpen = false"></div>
+
+      <div class="fixed inset-y-0 right-0 max-w-full flex pl-10">
+        <div class="w-screen max-w-lg bg-[#121215] border-l border-[#27272A] shadow-2xl flex flex-col animate-slide-in-right">
+          
+          <!-- Drawer Header -->
+          <div class="p-4 border-b border-[#27272A] flex items-center justify-between bg-[#09090B]">
+            <div class="flex items-center gap-2.5 truncate">
+              <i class="fa-solid text-sm text-indigo-400"
+                :class="{
+                  'fa-file-lines': drawerView === 'doc',
+                  'fa-folder-closed': drawerView === 'vault_list',
+                  'fa-inbox': drawerView === 'drafts_list',
+                  'fa-brain': drawerView === 'memory',
+                  'fa-sliders': drawerView === 'system'
+                }"></i>
+              <h3 class="text-sm font-semibold text-white truncate" x-text="drawerTitle"></h3>
+            </div>
+            <button @click="drawerOpen = false" class="p-1.5 text-zinc-400 hover:text-white rounded-md hover:bg-[#18181B] transition">
+              <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+          </div>
+
+          <!-- Drawer Content Router -->
+          <div class="flex-1 overflow-y-auto p-5 space-y-4">
+            
+            <!-- VIEW 1: DOCUMENT READER & TABLE VIEWER -->
+            <template x-if="drawerView === 'doc' && activeDocument">
+              <div class="space-y-4">
+                <div class="p-3 rounded-lg bg-[#18181B] border border-[#27272A] flex items-center justify-between text-xs">
+                  <div>
+                    <div class="font-semibold text-white" x-text="activeDocument.filename"></div>
+                    <div class="text-[10px] text-zinc-500 font-mono mt-0.5" x-text="(activeDocument.file_size_bytes / 1024).toFixed(1) + ' KB • ' + activeDocument.mime_type"></div>
+                  </div>
+                  <a :href="'/api/vault/' + activeDocument.doc_id + '/file'" target="_blank"
+                    class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs transition">
+                    Raw File
+                  </a>
+                </div>
+
+                <!-- Parsed Markdown Rendering -->
+                <div class="p-4 rounded-lg bg-[#09090B] border border-[#27272A]">
+                  <div class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-2">Parsed Document & Tables:</div>
+                  <div class="prose-argus" x-html="renderMarkdown(activeDocument.parsed_markdown || 'No parsed markdown content available.')"></div>
+                </div>
+              </div>
+            </template>
+
+            <!-- VIEW 2: VAULT DOCUMENTS LIST -->
+            <template x-if="drawerView === 'vault_list'">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between text-xs text-zinc-400">
+                  <span x-text="vaultDocuments.length + ' documents preserved in vault'"></span>
+                  <label class="cursor-pointer text-indigo-400 hover:underline">
+                    <span>+ Upload File</span>
+                    <input type="file" class="hidden" @change="handleFileUpload($event)">
+                  </label>
+                </div>
+
+                <div class="space-y-2">
+                  <template x-for="doc in vaultDocuments" :key="doc.doc_id">
+                    <div class="p-3 rounded-lg bg-[#18181B] border border-[#27272A] hover:border-indigo-500/40 flex items-center justify-between transition cursor-pointer"
+                         @click="openDocViewer(doc.doc_id)">
+                      <div class="truncate mr-3">
+                        <div class="text-xs font-semibold text-white truncate" x-text="doc.filename"></div>
+                        <div class="text-[10px] text-zinc-500 font-mono mt-0.5" x-text="(doc.file_size_bytes / 1024).toFixed(1) + ' KB • ' + (doc.table_count || 0) + ' tables'"></div>
+                      </div>
+                      <i class="fa-solid fa-arrow-right text-xs text-zinc-500"></i>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- VIEW 3: SUPERVISED DRAFTS -->
+            <template x-if="drawerView === 'drafts_list'">
+              <div class="space-y-3">
+                <div class="text-xs text-zinc-400">
+                  Under <strong>Supervised</strong> policy, outbound communications are staged in IMAP Drafts for approval before SMTP dispatch.
+                </div>
+
+                <template x-for="dr in (activeDrafts || [])" :key="dr.uid || dr.subject">
+                  <div class="p-4 rounded-lg bg-[#18181B] border border-[#27272A] space-y-3">
+                    <div class="flex items-center justify-between text-xs">
+                      <span class="font-semibold text-white truncate" x-text="dr.subject || 'No Subject'"></span>
+                      <span class="px-2 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30">Pending</span>
+                    </div>
+                    <div class="text-[11px] text-zinc-400" x-text="'To: ' + (dr.to || dr.to_email || 'Recipient')"></div>
+                    <div class="p-2.5 rounded bg-[#09090B] text-xs text-zinc-300 font-mono whitespace-pre-wrap max-h-36 overflow-y-auto" x-text="dr.body || dr.text"></div>
+                    <div class="flex items-center justify-end gap-2 pt-2">
+                      <button class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-medium transition">Approve & Send</button>
+                    </div>
+                  </div>
+                </template>
+
+                <div x-show="!activeDrafts || activeDrafts.length === 0" class="p-8 text-center text-xs text-zinc-500 border border-dashed border-[#27272A] rounded-lg">
+                  No drafts currently awaiting approval.
+                </div>
+              </div>
+            </template>
+
+            <!-- VIEW 4: COGNITIVE MEMORY INSPECTOR -->
+            <template x-if="drawerView === 'memory'">
+              <div class="space-y-4">
+                <div class="flex gap-2">
+                  <input type="text" x-model="memorySearchQuery" @input.debounce.300ms="searchMemory()" placeholder="Search active beliefs & memories..."
+                    class="flex-1 bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-1.5 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500">
+                  <select x-model="memoryNetworkFilter" @change="searchMemory()" class="bg-[#09090B] border border-[#27272A] rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 focus:outline-none">
+                    <option value="all">All</option>
+                    <option value="beliefs">Beliefs</option>
+                    <option value="facts">Facts</option>
+                    <option value="experiences">Experiences</option>
+                    <option value="entities">Entities</option>
+                  </select>
+                </div>
+
+                <div class="space-y-2">
+                  <template x-for="item in memoryItems" :key="item.id">
+                    <div class="p-3 rounded-lg bg-[#18181B] border border-[#27272A] space-y-1 text-xs">
+                      <div class="flex items-center justify-between font-mono text-[10px]">
+                        <span class="text-indigo-400 font-semibold uppercase" x-text="item.wing + ' / ' + item.key"></span>
+                        <span class="text-zinc-500" x-text="item.network || 'belief'"></span>
+                      </div>
+                      <div class="text-zinc-300 leading-relaxed" x-text="item.content"></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- VIEW 5: SYSTEM DIAGNOSTICS & TELEMETRY HUB -->
+            <template x-if="drawerView === 'system'">
+              <div class="space-y-5">
+                
+                <!-- Inference Model Switcher Card -->
+                <div class="p-4 rounded-xl bg-[#18181B] border border-[#27272A] space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-white">Active Inference Engine</span>
+                    <span class="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Online
+                    </span>
+                  </div>
+
+                  <div class="space-y-2">
+                    <template x-for="m in detailedModels" :key="m.id">
+                      <div @click="switchModel(m.id)"
+                        class="p-2.5 rounded-lg border cursor-pointer transition flex items-center justify-between"
+                        :class="status.model_name === m.id
+                          ? 'bg-indigo-950/30 border-indigo-500/80'
+                          : 'bg-[#09090B] border-[#27272A] hover:border-zinc-600'">
+                        <div>
+                          <div class="text-xs font-semibold text-white" x-text="m.name"></div>
+                          <div class="text-[10px] text-zinc-400 font-mono" x-text="m.tag"></div>
+                        </div>
+                        <i x-show="status.model_name === m.id" class="fa-solid fa-circle-check text-xs text-indigo-400"></i>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Local Infrastructure Status -->
+                <div class="p-4 rounded-xl bg-[#18181B] border border-[#27272A] space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-white">Local Services</span>
+                    <button @click="restartInfra()" :disabled="isRestartingInfra"
+                      class="text-indigo-400 hover:text-indigo-300 text-[11px] font-mono flex items-center gap-1">
+                      <i class="fa-solid fa-rotate-right text-[10px]" :class="isRestartingInfra ? 'animate-spin' : ''"></i>
+                      <span>Check / Restart</span>
+                    </button>
+                  </div>
+
+                  <div class="space-y-1.5 text-xs font-mono">
+                    <div class="flex items-center justify-between p-2 rounded bg-[#09090B]">
+                      <span class="text-zinc-300">Ollama (12K Context)</span>
+                      <span class="text-emerald-400">Ready</span>
+                    </div>
+                    <div class="flex items-center justify-between p-2 rounded bg-[#09090B]">
+                      <span class="text-zinc-300">Elasticsearch</span>
+                      <span class="text-emerald-400">Ready</span>
+                    </div>
+                    <div class="flex items-center justify-between p-2 rounded bg-[#09090B]">
+                      <span class="text-zinc-300">SearXNG (Live Web)</span>
+                      <span class="text-emerald-400">Ready</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Live Debug Log Viewer -->
+                <div class="p-4 rounded-xl bg-[#18181B] border border-[#27272A] space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-white">Execution Traces</span>
+                    <div class="flex items-center gap-2">
+                      <button @click="loadDebugEvents()" class="text-zinc-400 hover:text-white text-[11px]" title="Refresh"><i class="fa-solid fa-rotate-right"></i></button>
+                      <button @click="clearDebugBuffer()" class="text-zinc-400 hover:text-rose-400 text-[11px]" title="Clear"><i class="fa-solid fa-trash"></i></button>
+                      <a href="/api/debug/download" target="_blank" class="text-indigo-400 text-[11px] font-mono hover:underline">Log File</a>
+                    </div>
+                  </div>
+
+                  <div class="space-y-1.5 max-h-60 overflow-y-auto">
+                    <template x-for="ev in debugEvents" :key="ev.id">
+                      <div class="p-2 rounded bg-[#09090B] border border-[#27272A] text-[11px] font-mono space-y-1">
+                        <div class="flex items-center justify-between">
+                          <span class="text-indigo-400 font-semibold" x-text="ev.event_type"></span>
+                          <span class="text-zinc-500" x-text="ev.timestamp?.split('T')[1]?.substring(0, 8)"></span>
+                        </div>
+                        <div class="text-zinc-300 text-[10px]" x-text="ev.message"></div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+              </div>
+            </template>
+
+          </div>
+
+        </div>
+      </div>
     </div>
-  </div>
 
-  <!-- Toast Notification -->
-  <div x-show="toastMessage" x-transition class="fixed bottom-6 right-6 z-50 bg-zinc-900 border border-teal-500/60 shadow-2xl rounded-lg px-4 py-3 flex items-center gap-2.5 text-xs text-white">
-    <i class="fa-solid fa-circle-check text-teal-400"></i>
-    <span x-text="toastMessage"></span>
-  </div>
+    <!-- =================================================================== -->
+    <!-- GLOBAL COMMAND PALETTE MODAL (Cmd+K)                                -->
+    <!-- =================================================================== -->
+    <div x-show="commandPaletteOpen" x-cloak class="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4">
+      <div class="fixed inset-0 bg-black/70 backdrop-blur-sm" @click="commandPaletteOpen = false"></div>
 
-  <!-- Alpine App Logic -->
-  <script>
-    function workosApp() {
-      return {
-        activeTab: 'chat',
-        showModelModal: false,
-        toastMessage: '',
-        isThinking: false,
-        thinkingStatus: 'Analyzing with Cognitive Memory',
-        chatInput: '',
-        chatMessages: [],
-        currentSessionId: 'session_' + Math.random().toString(36).substring(2, 8),
-        sessions: [],
-        status: {
-          ollama_online: true,
-          model_name: 'refinedneuro/refinedtoolcallv5-3b',
-          autonomy_level: 'SUPERVISED',
-          documents_count: 0,
-          active_beliefs_count: 0,
-          trusted_recipients: [],
-          num_ctx: 12288
-        },
-        availableModels: [],
-        detailedModels: [
-          {
-            id: 'refinedneuro/refinedtoolcallv5-3b',
-            name: 'RefinedToolCallV5 (3.1B)',
-            recommended: true,
-            tag: '★ Recommended for Tool Calling & Autonomous DAG Plans',
-            context: '12,288 tokens (Safe 12K Window - 500MB VRAM Headroom)',
-            active: true
-          },
-          {
-            id: 'hf.co/unsloth/SmolLM3-3B-GGUF:UD-Q6_K_XL',
-            name: 'SmolLM3 (3.1B)',
-            recommended: false,
-            tag: 'Conversational Specialist & Executive Drafting',
-            context: '12,288 tokens (Safe 12K Window)',
-            active: false
-          },
-          {
-            id: 'hf.co/Qwen/Qwen3-1.7B-GGUF:Q8_0',
-            name: 'Qwen3 (1.7B)',
-            recommended: false,
-            tag: 'Fast Lightweight Reasoning',
-            context: '12,288 tokens (Safe 12K Window)',
-            active: false
-          }
-        ],
-        currentPlan: null,
-        dagGoalInput: '',
-        memorySearchQuery: '',
-        memoryNetworkFilter: 'all',
-        memoryItems: [],
-        vaultDocuments: [],
-        infra: {
-          status: 'ready',
-          services: {
-            ollama: { online: true, name: 'Ollama' },
-            elasticsearch: { online: true, name: 'Elasticsearch' },
-            searxng: { online: true, name: 'SearXNG' }
-          }
-        },
-        isRestartingInfra: false,
-        debugEvents: [],
-        debugSummary: { total_events: 0, error_count: 0, type_counts: {}, level_counts: {} },
-        debugFilterType: 'all',
-        debugFilterLevel: 'all',
-        debugSearchQuery: '',
-        debugExpandedEventId: null,
-        isDebugRefreshing: false,
+      <div class="relative bg-[#121215] border border-[#27272A] rounded-xl max-w-lg w-full shadow-2xl overflow-hidden animate-fade-in z-10">
+        <!-- Search Input -->
+        <div class="p-3 border-b border-[#27272A] flex items-center gap-2.5">
+          <i class="fa-solid fa-magnifying-glass text-xs text-zinc-500"></i>
+          <input id="commandPaletteInput" type="text" x-model="commandQuery" placeholder="Type a command or search sessions..."
+            class="flex-1 bg-transparent text-sm text-white placeholder-zinc-500 focus:outline-none">
+          <kbd class="px-1.5 py-0.5 rounded bg-[#18181B] border border-[#27272A] text-[10px] font-mono text-zinc-400">ESC</kbd>
+        </div>
 
-        async initApp() {
-          await this.loadStatus();
-          await this.loadModels();
-          await this.loadInfra();
-          await this.loadSessions();
-          await this.searchMemory();
-          await this.loadVault();
-          await this.loadDebugEvents();
-          setInterval(() => {
-            if (this.activeTab === 'debug') {
-              this.loadDebugEvents(true);
-            }
-          }, 3000);
-        },
+        <!-- Quick Command Results -->
+        <div class="p-2 max-h-80 overflow-y-auto space-y-1 text-xs">
+          
+          <button @click="newSession(); commandPaletteOpen = false" class="w-full p-2 rounded-lg hover:bg-[#18181B] flex items-center justify-between text-left text-zinc-200">
+            <span class="flex items-center gap-2"><i class="fa-solid fa-plus text-indigo-400 text-xs"></i> Start New Conversation</span>
+            <span class="text-[10px] text-zinc-500 font-mono">N</span>
+          </button>
 
-        async loadDebugEvents(silent = false) {
-          if (!silent) this.isDebugRefreshing = true;
-          try {
-            let url = `/api/debug/events?limit=200`;
-            if (this.debugFilterType !== 'all') url += `&event_type=${this.debugFilterType}`;
-            if (this.debugFilterLevel !== 'all') url += `&level=${this.debugFilterLevel}`;
-            if (this.debugSearchQuery) url += `&search=${encodeURIComponent(this.debugSearchQuery)}`;
-            const res = await fetch(url);
-            if (res.ok) {
-              const data = await res.json();
-              this.debugEvents = data.events || [];
-              this.debugSummary = data.summary || this.debugSummary;
-            }
-          } catch (e) {
-            console.debug('Debug events load error:', e);
-          } finally {
-            if (!silent) this.isDebugRefreshing = false;
-          }
-        },
+          <button @click="openVaultWorkspace(); commandPaletteOpen = false" class="w-full p-2 rounded-lg hover:bg-[#18181B] flex items-center justify-between text-left text-zinc-200">
+            <span class="flex items-center gap-2"><i class="fa-solid fa-folder-closed text-cyan-400 text-xs"></i> Open Document Vault</span>
+          </button>
 
-        async clearDebugEvents() {
-          try {
-            await fetch('/api/debug/clear', { method: 'POST' });
-            this.debugEvents = [];
-            this.debugSummary = { total_events: 0, error_count: 0, type_counts: {}, level_counts: {} };
-            this.showToast('Debug trace buffer cleared.');
-          } catch (e) {
-            console.error('Clear debug error:', e);
-          }
-        },
+          <button @click="openMailDrafts(); commandPaletteOpen = false" class="w-full p-2 rounded-lg hover:bg-[#18181B] flex items-center justify-between text-left text-zinc-200">
+            <span class="flex items-center gap-2"><i class="fa-solid fa-inbox text-emerald-400 text-xs"></i> Review Supervised Mail Drafts</span>
+          </button>
 
-        toggleEventExpand(id) {
-          this.debugExpandedEventId = this.debugExpandedEventId === id ? null : id;
-        },
+          <button @click="openMemoryInspector(); commandPaletteOpen = false" class="w-full p-2 rounded-lg hover:bg-[#18181B] flex items-center justify-between text-left text-zinc-200">
+            <span class="flex items-center gap-2"><i class="fa-solid fa-brain text-purple-400 text-xs"></i> Inspect Cognitive Memory Palace</span>
+          </button>
 
-        copyToClipboard(text) {
-          if (navigator.clipboard) {
-            navigator.clipboard.writeText(text).then(() => {
-              this.showToast('Copied JSON to clipboard');
-            });
-          }
-        },
+          <button @click="openSystemHub(); commandPaletteOpen = false" class="w-full p-2 rounded-lg hover:bg-[#18181B] flex items-center justify-between text-left text-zinc-200">
+            <span class="flex items-center gap-2"><i class="fa-solid fa-sliders text-indigo-400 text-xs"></i> System Diagnostics & Model Switcher</span>
+          </button>
 
-        async loadInfra() {
-          try {
-            const res = await fetch('/api/infra/status');
-            if (res.ok) {
-              this.infra = await res.json();
-            }
-          } catch (e) {
-            console.debug('Failed to load infra status', e);
-          }
-        },
+          <button @click="togglePolicy(); commandPaletteOpen = false" class="w-full p-2 rounded-lg hover:bg-[#18181B] flex items-center justify-between text-left text-zinc-200">
+            <span class="flex items-center gap-2"><i class="fa-solid fa-shield-halved text-amber-400 text-xs"></i> Toggle Autonomy Mode</span>
+            <span class="text-[10px] font-mono text-zinc-500" x-text="status.autonomy_level"></span>
+          </button>
 
-        async restartInfra() {
-          this.isRestartingInfra = true;
-          try {
-            const res = await fetch('/api/infra/restart', { method: 'POST' });
-            if (res.ok) {
-              this.infra = await res.json();
-              this.showToast('Infrastructure verified & online!');
-            }
-          } catch (e) {
-            this.showToast('Infra check failed: ' + e);
-          } finally {
-            this.isRestartingInfra = false;
-          }
-        },
+          <!-- Matching Sessions -->
+          <div x-show="sessions.length > 0" class="pt-2 border-t border-[#1E1E22]">
+            <div class="px-2 py-1 text-[9px] font-mono uppercase text-zinc-500">Conversations</div>
+            <template x-for="s in sessions.filter(s => !commandQuery || s.title?.toLowerCase().includes(commandQuery.toLowerCase()))" :key="s.session_id">
+              <button @click="switchSession(s.session_id); commandPaletteOpen = false" class="w-full p-2 rounded-lg hover:bg-[#18181B] flex items-center justify-between text-left text-zinc-300">
+                <span class="truncate" x-text="s.title"></span>
+                <span class="text-[10px] text-zinc-500 font-mono ml-2" x-text="s.turn_count + ' turns'"></span>
+              </button>
+            </template>
+          </div>
 
-        showToast(msg) {
-          this.toastMessage = msg;
-          setTimeout(() => { this.toastMessage = ''; }, 3000);
-        },
+        </div>
+      </div>
+    </div>
 
-        formatModelName(name) {
-          if (!name) return 'RefinedToolCallV5 (3B)';
-          if (name.includes('refinedtoolcall')) return 'RefinedToolCallV5 (3B)';
-          if (name.includes('SmolLM3')) return 'SmolLM3 (3B)';
-          if (name.includes('Qwen3')) return 'Qwen3 (1.7B)';
-          return name.split('/').pop().split(':')[0];
-        },
-
-        formatTime(ts) {
-          if (!ts) return '';
-          const d = new Date(ts * 1000);
-          return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        },
-
-        renderMathAndMarkdown(md) {
-          if (!md) return '';
-          let text = String(md);
-
-          // Strip <think>...</think> chain-of-thought blocks if emitted by reasoning models
-          text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-
-          // 1. Extract block & inline LaTeX math formulas into protected placeholders
-          const mathBlocks = [];
-
-          // Environment math: \begin{...} ... \end{...}
-          text = text.replace(/\\begin\{([a-zA-Z*]+)\}([\s\S]+?)\\end\{\1\}/g, (match) => {
-            try {
-              if (window.katex) {
-                const rendered = katex.renderToString(match.trim(), { displayMode: true, throwOnError: false });
-                const placeholder = `___KATEX_BLOCK_${mathBlocks.length}___`;
-                mathBlocks.push(rendered);
-                return placeholder;
-              }
-            } catch (e) {
-              console.warn('KaTeX env error:', e);
-            }
-            return match;
-          });
-
-          // Display math: $$...$$ or \[...\]
-          text = text.replace(/\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]/g, (match, p1, p2) => {
-            const formula = p1 || p2 || '';
-            try {
-              if (window.katex) {
-                const rendered = katex.renderToString(formula.trim(), { displayMode: true, throwOnError: false });
-                const placeholder = `___KATEX_BLOCK_${mathBlocks.length}___`;
-                mathBlocks.push(rendered);
-                return placeholder;
-              }
-            } catch (e) {
-              console.warn('KaTeX block error:', e);
-            }
-            return match;
-          });
-
-          // Inline math: $...$ or \(...\) (protect against standalone currency values like $500)
-          text = text.replace(/(?<!\\)\$([^\$\n]+?)(?<!\\)\$|\\\(([\s\S]+?)\\\)/g, (match, p1, p2) => {
-            const formula = (p1 || p2 || '').trim();
-            // Don't render currency like "$500" or "$1,200.00" as math
-            if (/^\d{1,3}(,\d{3})*(\.\d+)?$/.test(formula)) {
-              return match;
-            }
-            try {
-              if (window.katex) {
-                const rendered = katex.renderToString(formula, { displayMode: false, throwOnError: false });
-                const placeholder = `___KATEX_INLINE_${mathBlocks.length}___`;
-                mathBlocks.push(rendered);
-                return placeholder;
-              }
-            } catch (e) {
-              console.warn('KaTeX inline error:', e);
-            }
-            return match;
-          });
-
-          // 2. Parse Markdown using Marked.js
-          let html = '';
-          try {
-            html = marked.parse(text);
-          } catch (e) {
-            html = `<p>${text}</p>`;
-          }
-
-          // 3. Restore KaTeX rendered math tokens
-          mathBlocks.forEach((rendered, idx) => {
-            html = html.replace(`___KATEX_BLOCK_${idx}___`, `<div class="katex-display-wrapper overflow-x-auto">${rendered}</div>`);
-            html = html.replace(`___KATEX_INLINE_${idx}___`, rendered);
-          });
-
-          // 4. Interactive citation badges [1], [2], etc.
-          html = html.replace(/\[(\d+)\]/g, (match, num) => {
-            return `<button type="button" class="citation-tag inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded text-xs font-mono font-bold bg-teal-950/60 border border-teal-500/50 text-teal-400 hover:bg-teal-500 hover:text-gray-950 transition cursor-pointer shadow-sm" onclick="window.handleCitationClick('${num}')">[${num}]</button>`;
-          });
-
-          return html;
-        },
-
-        renderMarkdown(md) {
-          return this.renderMathAndMarkdown(md);
-        },
-
-        renderEnhancedMarkdown(md) {
-          return this.renderMathAndMarkdown(md);
-        },
-
-        formatBytes(bytes) {
-          if (!bytes) return '0 B';
-          const k = 1024;
-          const sizes = ['B', 'KB', 'MB', 'GB'];
-          const i = Math.floor(Math.log(bytes) / Math.log(k));
-          return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-        },
-
-        async loadStatus() {
-          try {
-            const res = await fetch('/api/status');
-            if (res.ok) {
-              this.status = await res.json();
-            }
-          } catch (e) {
-            console.error('Status fetch error:', e);
-          }
-        },
-
-        async loadModels() {
-          try {
-            const res = await fetch('/api/models');
-            if (res.ok) {
-              const data = await res.json();
-              if (data.detailed_models && data.detailed_models.length) {
-                this.detailedModels = data.detailed_models;
-              }
-              if (data.active_model) {
-                this.status.model_name = data.active_model;
-              }
-            }
-          } catch (e) {
-            console.error('Models fetch error:', e);
-          }
-        },
-
-        async switchModel(modelName) {
-          try {
-            const res = await fetch('/api/model', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ model_name: modelName })
-            });
-            if (res.ok) {
-              this.status.model_name = modelName;
-              this.showToast(`Switched active model to ${this.formatModelName(modelName)} (8K context active)`);
-              this.showModelModal = false;
-              await this.loadModels();
-            }
-          } catch (e) {
-            console.error('Model switch error:', e);
-          }
-        },
-
-        async togglePolicy() {
-          const next = this.status.autonomy_level === 'FULL' ? 'SUPERVISED' : 'FULL';
-          try {
-            const res = await fetch('/api/policy', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ autonomy_level: next })
-            });
-            if (res.ok) {
-              this.status.autonomy_level = next;
-              this.showToast(`Autonomy policy updated to ${next}`);
-            }
-          } catch (e) {
-            console.error('Policy toggle error:', e);
-          }
-        },
-
-        async loadSessions() {
-          try {
-            const res = await fetch('/api/sessions');
-            if (res.ok) {
-              const data = await res.json();
-              this.sessions = data.sessions || [];
-            }
-          } catch (e) {
-            console.error('Sessions error:', e);
-          }
-        },
-
-        async switchSession(sessId) {
-          this.currentSessionId = sessId;
-          await this.loadSessionChat(sessId);
-        },
-
-        startNewSession() {
-          this.currentSessionId = 'session_' + Math.random().toString(36).substring(2, 8);
-          this.chatMessages = [];
-          this.showToast('Started fresh dialogue session');
-        },
-
-        async clearCurrentSession(sessId) {
-          try {
-            await fetch(`/api/session/${sessId}`, { method: 'DELETE' });
-            if (this.currentSessionId === sessId) {
-              this.chatMessages = [];
-            }
-            await this.loadSessions();
-            this.showToast(`Cleared dialogue drawer: ${sessId}`);
-          } catch (e) {
-            console.error('Clear session error:', e);
-          }
-        },
-
-        async loadSessionChat(sessId) {
-          try {
-            const res = await fetch(`/api/session/${sessId}`);
-            if (res.ok) {
-              const data = await res.json();
-              this.chatMessages = (data.turns || []).map(t => ({
-                role: t.role,
-                content: t.content,
-                timestamp: t.created_at,
-                plan: null
-              }));
-              this.scrollChat();
-            }
-          } catch (e) {
-            console.error('Session chat error:', e);
-          }
-        },
-
-        scrollChat() {
-          this.$nextTick(() => {
-            const el = document.getElementById('chatStream');
-            if (el) el.scrollTop = el.scrollHeight;
-          });
-        },
-
-        sendQuickPrompt(text) {
-          this.chatInput = text;
-          this.sendMessage();
-        },
-
-        async sendMessage() {
-          const text = this.chatInput.trim();
-          if (!text || this.isThinking) return;
-
-          this.chatMessages.push({
-            role: 'user',
-            content: text,
-            timestamp: Date.now() / 1000
-          });
-          this.chatInput = '';
-          this.isThinking = true;
-          this.thinkingStatus = 'Analyzing intent and memory context...';
-          this.scrollChat();
-
-          try {
-            const res = await fetch('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                message: text,
-                session_id: this.currentSessionId
-              })
-            });
-
-            if (res.ok) {
-              const data = await res.json();
-              this.chatMessages.push({
-                role: 'assistant',
-                content: data.message || '',
-                timestamp: Date.now() / 1000,
-                plan: data.plan || null
-              });
-              if (data.plan) {
-                this.currentPlan = data.plan;
-              }
-              await this.loadSessions();
-            } else {
-              this.chatMessages.push({
-                role: 'assistant',
-                content: `Execution error: ${res.statusText}`,
-                timestamp: Date.now() / 1000
-              });
-            }
-          } catch (err) {
-            this.chatMessages.push({
-              role: 'assistant',
-              content: `Network or inference error: ${err}`,
-              timestamp: Date.now() / 1000
-            });
-          } finally {
-            this.isThinking = false;
-            this.scrollChat();
-          }
-        },
-
-        async executeGoalDirect(goal) {
-          if (!goal.trim()) return;
-          this.isThinking = true;
-          try {
-            const res = await fetch('/api/execute', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ goal: goal, session_id: this.currentSessionId })
-            });
-            if (res.ok) {
-              const plan = await res.json();
-              this.currentPlan = plan;
-              this.showToast('Operations DAG completed successfully!');
-            }
-          } catch (e) {
-            console.error('DAG execution error:', e);
-          } finally {
-            this.isThinking = false;
-          }
-        },
-
-        async searchMemory() {
-          try {
-            let url = '/api/memory';
-            const params = [];
-            if (this.memorySearchQuery.trim()) params.push(`query=${encodeURIComponent(this.memorySearchQuery.trim())}`);
-            if (this.memoryNetworkFilter !== 'all') params.push(`network=${this.memoryNetworkFilter}`);
-            if (params.length) url += '?' + params.join('&');
-
-            const res = await fetch(url);
-            if (res.ok) {
-              const data = await res.json();
-              this.memoryItems = data.memories || [];
-            }
-          } catch (e) {
-            console.error('Memory fetch error:', e);
-          }
-        },
-
-        async loadVault() {
-          try {
-            const res = await fetch('/api/vault/documents');
-            if (res.ok) {
-              const data = await res.json();
-              this.vaultDocuments = data.documents || [];
-            }
-          } catch (e) {
-            console.error('Vault fetch error:', e);
-          }
-        }
-      }
-    }
-  </script>
 </body>
 </html>

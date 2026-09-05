@@ -204,7 +204,7 @@ async def stream_subagent_events(session_id: str):
                     event = await asyncio.wait_for(queue.get(), timeout=15.0)
                     event_data = event.to_dict()
                     yield f"event: trace\ndata: {json.dumps(event_data)}\n\n"
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     yield ": keep-alive\n\n"
         except asyncio.CancelledError:
             pass

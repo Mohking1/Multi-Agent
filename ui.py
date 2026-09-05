@@ -61,7 +61,7 @@ def setup_clean_exit_handlers(port: int = 8000) -> None:
             else ("Ctrl+C (SIGINT)" if sig == signal.SIGINT else f"Signal {sig}")
         )
         print(
-            f"\n✦ Intercepted {sig_name} — Instantly terminating WorkOS UI and releasing port {port}..."
+            f"\n✦ Intercepted {sig_name} — Instantly terminating Argus OS and releasing port {port}..."
         )
         free_port_if_bound(port)
         os._exit(0)
@@ -76,8 +76,8 @@ if __name__ == "__main__":
     setup_clean_exit_handlers(port=8000)
     free_port_if_bound(port=8000)
 
-    print("✦ Initializing WorkOS Infrastructure (Ollama, Elasticsearch, SearXNG)...")
+    print("✦ Initializing Argus OS Infrastructure (Ollama, Elasticsearch, SearXNG)...")
     ensure_all_infrastructure(verbose=True)
 
-    print("✦ Starting WorkOS Minimalist Web UI on http://localhost:8000")
+    print("✦ Starting Argus OS Executive Web Interface on http://localhost:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)

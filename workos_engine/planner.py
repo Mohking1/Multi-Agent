@@ -719,10 +719,7 @@ class ExecutivePlanner:
                     if inspect.iscoroutine(res):
                         res = await res
                 step_dur_ms = int((datetime.now() - step_t0).total_seconds() * 1000)
-                if hasattr(res, "duration_ms"):
-                    res.duration_ms = step_dur_ms
-                else:
-                    setattr(res, "duration_ms", step_dur_ms)
+                res.duration_ms = step_dur_ms
                 step.duration_ms = step_dur_ms
                 step.result = res
                 step.status = "completed" if res.success else "failed"
