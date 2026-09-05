@@ -16,6 +16,14 @@ class MemoryDB:
     """
 
     def __init__(self, db_path: str = ":memory:"):
+        from config import is_test_environment
+
+        if is_test_environment() and db_path != ":memory:":
+            prod_db = os.path.abspath("workos_memory.db")
+            if os.path.abspath(db_path) == prod_db:
+                test_db = os.getenv("WORKOS_MEMORY_DB") or f"/tmp/workos_test_memory_{os.getpid()}.db"
+                db_path = test_db
+
         self.db_path = db_path
         if db_path != ":memory:":
             os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)

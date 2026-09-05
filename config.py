@@ -1,4 +1,5 @@
 import os
+import sys
 from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
@@ -6,6 +7,15 @@ from dotenv import load_dotenv
 from workos_engine.types import AutonomyLevel
 
 load_dotenv()
+
+
+def is_test_environment() -> bool:
+    """Detects if runtime is currently executing under pytest, simulation, or test mode."""
+    return bool(
+        os.getenv("WORKOS_TEST_MODE") == "1"
+        or os.getenv("PYTEST_CURRENT_TEST")
+        or "pytest" in sys.modules
+    )
 
 
 @dataclass
@@ -52,9 +62,25 @@ class WorkOSConfig:
 
     # Cognitive Memory
     memory_db_path: str = field(
-        default_factory=lambda: os.getenv("WORKOS_MEMORY_DB", "workos_memory.db")
+        default_factory=lambda: (
+            os.getenv("WORKOS_MEMORY_DB")
+            or (
+                f"/tmp/workos_test_memory_{os.getpid()}.db"
+                if is_test_environment()
+                else "workos_memory.db"
+            )
+        )
     )
-    vault_dir: str = field(default_factory=lambda: os.getenv("WORKOS_VAULT_DIR", "data/vault"))
+    vault_dir: str = field(
+        default_factory=lambda: (
+            os.getenv("WORKOS_VAULT_DIR")
+            or (
+                f"/tmp/workos_test_vault_{os.getpid()}"
+                if is_test_environment()
+                else "data/vault"
+            )
+        )
+    )
     auto_start_infrastructure: bool = field(
         default_factory=lambda: (
             os.getenv("WORKOS_AUTO_START_INFRA", "true").lower() not in ("0", "false", "no", "off")

@@ -40,7 +40,18 @@ class DocumentVault:
     """
 
     def __init__(self, vault_dir: str | None = None):
-        self.vault_dir = Path(vault_dir or os.getenv("WORKOS_VAULT_DIR", "data/vault")).resolve()
+        from config import is_test_environment
+
+        resolved_dir = Path(vault_dir or os.getenv("WORKOS_VAULT_DIR", "data/vault")).resolve()
+        if is_test_environment():
+            prod_vault = Path("data/vault").resolve()
+            if resolved_dir == prod_vault:
+                test_vault = (
+                    os.getenv("WORKOS_VAULT_DIR") or f"/tmp/workos_test_vault_{os.getpid()}"
+                )
+                resolved_dir = Path(test_vault).resolve()
+
+        self.vault_dir = resolved_dir
         self.docs_dir = self.vault_dir / "documents"
         self.parsed_dir = self.vault_dir / "parsed"
         self.catalog_file = self.vault_dir / "catalog.json"

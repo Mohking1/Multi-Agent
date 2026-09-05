@@ -22,12 +22,112 @@ class MailToolKit:
     def __init__(self, config: WorkOSConfig | None = None):
         self.config = config or get_config()
 
+    def resolve_folder_name(self, folder: str | None, mailbox: MailBox | None = None) -> str:
+        """
+        Resolves canonical or logical mailbox aliases (e.g. 'Drafts', 'Sent', 'Trash', 'Spam', 'All Mail')
+        to the server's actual folder name, respecting Gmail namespace conventions and IMAP special-use flags.
+        """
+        if not folder:
+            return "INBOX"
+
+        f_clean = folder.strip()
+        f_lower = f_clean.lower()
+        is_gmail = "gmail" in (self.config.imap_host or "").lower()
+
+        if is_gmail:
+            if f_lower in ("drafts", "draft", "[gmail]/drafts"):
+                return "[Gmail]/Drafts"
+            if f_lower in ("sent", "sent mail", "sent messages", "sent items", "[gmail]/sent mail"):
+                return "[Gmail]/Sent Mail"
+            if f_lower in ("trash", "bin", "[gmail]/trash", "[gmail]/bin"):
+                return "[Gmail]/Bin"
+            if f_lower in ("spam", "junk", "[gmail]/spam"):
+                return "[Gmail]/Spam"
+            if f_lower in ("all", "all mail", "[gmail]/all mail"):
+                return "[Gmail]/All Mail"
+            if f_lower in ("starred", "[gmail]/starred"):
+                return "[Gmail]/Starred"
+            if f_lower in ("important", "[gmail]/important"):
+                return "[Gmail]/Important"
+            if f_lower == "inbox":
+                return "INBOX"
+
+        if mailbox is not None:
+            discovered = self._discover_folder(mailbox, f_clean)
+            if discovered:
+                return discovered
+
+        return f_clean
+
+    def _discover_folder(self, mailbox: MailBox, folder: str) -> str | None:
+        """Discovers folder from server list matching by name, special-use flags, or hierarchy."""
+        f_clean = folder.strip().lower()
+        flag_map = {
+            "drafts": "\\Drafts",
+            "draft": "\\Drafts",
+            "sent": "\\Sent",
+            "sent mail": "\\Sent",
+            "sent items": "\\Sent",
+            "trash": "\\Trash",
+            "bin": "\\Trash",
+            "spam": "\\Junk",
+            "junk": "\\Junk",
+            "all mail": "\\All",
+            "all": "\\All",
+            "archive": "\\Archive",
+            "starred": "\\Flagged",
+            "flagged": "\\Flagged",
+        }
+        target_flag = flag_map.get(f_clean)
+        try:
+            folders = list(mailbox.folder.list())
+            if target_flag:
+                for f in folders:
+                    flags = [flag.lower() for flag in (getattr(f, "flags", ()) or ())]
+                    if target_flag.lower() in flags:
+                        return f.name
+            for f in folders:
+                if f.name.lower() == f_clean:
+                    return f.name
+            for f in folders:
+                if (
+                    f.name.lower().endswith(f_clean)
+                    or f.name.lower().endswith(f"/{f_clean}")
+                    or f.name.lower().endswith(f".{f_clean}")
+                ):
+                    return f.name
+        except Exception as e:
+            logger.debug(f"Folder discovery failed: {e}")
+        return None
+
     def _get_mailbox(self, folder: str = "INBOX", timeout: float = 30.0) -> MailBox:
-        """Connects and logs into the IMAP mailbox on the given folder."""
+        """Connects and logs into the IMAP mailbox on the given folder with dynamic fallback."""
         if not self.config.imap_host:
             raise ValueError("IMAP host is not configured.")
+        target_folder = self.resolve_folder_name(folder)
         mb = MailBox(self.config.imap_host, port=self.config.imap_port, timeout=timeout)
-        return mb.login(self.config.imap_user, self.config.imap_password, initial_folder=folder)
+        try:
+            return mb.login(
+                self.config.imap_user, self.config.imap_password, initial_folder=target_folder
+            )
+        except Exception as e:
+            err_str = str(e).lower()
+            if "nonexistent" in err_str or "unknown mailbox" in err_str or "failure" in err_str:
+                mb_fallback = MailBox(self.config.imap_host, port=self.config.imap_port, timeout=timeout)
+                client = mb_fallback.login(
+                    self.config.imap_user, self.config.imap_password, initial_folder="INBOX"
+                )
+                resolved = self._discover_folder(client, folder)
+                if resolved and resolved != "INBOX":
+                    try:
+                        client.folder.set(resolved)
+                        return client
+                    except Exception:
+                        pass
+                if folder.upper() == "INBOX":
+                    raise
+                return client
+            raise
 
     def _parse_date(self, d: Any) -> date | None:
         if isinstance(d, datetime):
@@ -116,9 +216,10 @@ class MailToolKit:
         results: list[dict[str, Any]] = []
         seen_uids: set[str] = set()
 
-        folders_to_search = [folder]
+        resolved_folder = self.resolve_folder_name(folder)
+        folders_to_search = [resolved_folder]
         is_gmail = "gmail" in (self.config.imap_host or "").lower()
-        if is_gmail and folder == "INBOX":
+        if is_gmail and folder.upper() == "INBOX":
             folders_to_search.append("[Gmail]/All Mail")
 
         for search_folder in folders_to_search:
@@ -182,7 +283,10 @@ class MailToolKit:
                     or "connection refused" in err_str
                 ):
                     raise
-                logger.warning(f"IMAP search error in {search_folder}: {e}")
+                if "nonexistent" in err_str or "unknown mailbox" in err_str:
+                    logger.info(f"Mailbox '{search_folder}' does not exist on server; skipping.")
+                else:
+                    logger.warning(f"IMAP search error in {search_folder}: {e}")
 
         return results
 
@@ -217,7 +321,8 @@ class MailToolKit:
         if parsed_lt:
             base_criteria["date_lt"] = parsed_lt
 
-        folders_to_search = [folder]
+        resolved_folder = self.resolve_folder_name(folder)
+        folders_to_search = [resolved_folder]
         is_gmail = "gmail" in (self.config.imap_host or "").lower()
         if is_gmail and folder.upper() in ("INBOX", "ALL", "ALL MAIL", "[GMAIL]/ALL MAIL"):
             folders_to_search = ["[Gmail]/All Mail"]
@@ -443,11 +548,12 @@ class MailToolKit:
         msg.set_content(body)
 
         try:
-            with self._get_mailbox(folder=folder) as mailbox:
-                mailbox.append(msg.as_bytes(), folder=folder)
-        except Exception:
+            target_folder = self.resolve_folder_name(folder)
+            with self._get_mailbox(folder=target_folder) as mailbox:
+                mailbox.append(msg.as_bytes(), folder=target_folder)
+        except Exception as e:
             # Non-blocking if IMAP server is not reachable or drafts folder doesn't exist
-            pass
+            logger.debug(f"Failed to append draft to {folder}: {e}")
 
         return {
             "status": "draft_created",

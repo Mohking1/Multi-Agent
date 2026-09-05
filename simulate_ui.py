@@ -14,8 +14,17 @@ Usage:
 """
 
 import json
+import os
+import shutil
+import tempfile
 import time
 from unittest.mock import patch
+
+# Force isolated simulation environment before engine/app imports
+sim_dir = tempfile.mkdtemp(prefix="argus_sim_")
+os.environ["WORKOS_TEST_MODE"] = "1"
+os.environ["WORKOS_MEMORY_DB"] = os.path.join(sim_dir, "sim_memory.db")
+os.environ["WORKOS_VAULT_DIR"] = os.path.join(sim_dir, "sim_vault")
 
 from fastapi.testclient import TestClient
 
@@ -218,4 +227,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        shutil.rmtree(sim_dir, ignore_errors=True)
