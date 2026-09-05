@@ -8,6 +8,7 @@ in-memory circular buffer for real-time inspection via the UI and API.
 
 from __future__ import annotations
 
+import asyncio
 import collections
 import dataclasses
 import json
@@ -72,6 +73,7 @@ class DebugTraceManager:
         self._lock = threading.Lock()
         self._buffer: collections.deque[TraceEvent] = collections.deque(maxlen=buffer_size)
         self._event_counter = 0
+        self._subscribers: list[tuple[asyncio.Queue, str | None, asyncio.AbstractEventLoop | None]] = []
 
         target_dir = log_dir or os.getenv("WORKOS_LOG_DIR", "data/logs")
         self.log_dir = Path(target_dir).resolve()
@@ -118,13 +120,37 @@ class DebugTraceManager:
             except Exception as e:
                 logger.debug(f"Failed to append to debug log file: {e}")
 
-            # Also echo ERROR and WARNING to standard logger
-            if event.level == "ERROR":
-                logger.error(f"[{event.component}] {event.message} - error: {error}")
-            elif event.level == "WARNING":
-                logger.warning(f"[{event.component}] {event.message}")
+            # Broadcast to live subscribers (e.g. SSE stream listeners)
+            for q, sub_sess, loop in list(self._subscribers):
+                if sub_sess is None or sub_sess == session_id or session_id is None:
+                    try:
+                        if loop and loop.is_running():
+                            loop.call_soon_threadsafe(q.put_nowait, event)
+                        else:
+                            q.put_nowait(event)
+                    except Exception:
+                        pass
 
             return event
+
+    def subscribe(
+        self, session_id: str | None = None, loop: asyncio.AbstractEventLoop | None = None
+    ) -> asyncio.Queue[TraceEvent]:
+        """Subscribes an asyncio.Queue to real-time trace events (with optional session filter)."""
+        q: asyncio.Queue[TraceEvent] = asyncio.Queue()
+        if loop is None:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+        with self._lock:
+            self._subscribers.append((q, session_id, loop))
+        return q
+
+    def unsubscribe(self, q: asyncio.Queue) -> None:
+        """Unregisters an active subscriber queue."""
+        with self._lock:
+            self._subscribers = [item for item in self._subscribers if item[0] is not q]
 
     def log_prompt(
         self,

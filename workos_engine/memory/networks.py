@@ -249,6 +249,18 @@ class CognitiveMemoryEngine:
         """
         return self.db.list_active_sessions()
 
+    def set_session_title(self, session_id: str, title: str) -> None:
+        """
+        Sets a human-readable title for a session.
+        """
+        self.db.set_session_title(session_id=session_id, title=title)
+
+    def get_session_title(self, session_id: str) -> str | None:
+        """
+        Gets the human-readable title for a session.
+        """
+        return self.db.get_session_title(session_id=session_id)
+
     def deduplicate(self) -> int:
         """
         Cleans up duplicate memories from database.

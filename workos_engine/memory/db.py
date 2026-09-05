@@ -150,6 +150,17 @@ class MemoryDB:
                 "CREATE INDEX IF NOT EXISTS idx_turns_session ON conversation_turns(session_id, created_at);"
             )
 
+            # 8. Session metadata table for human-readable session titles
+            self.conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS session_metadata (
+                    session_id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    updated_at REAL NOT NULL
+                );
+                """
+            )
+
     def _row_to_memory_item(self, row: sqlite3.Row) -> MemoryItem:
         raw_meta = row["metadata"]
         meta = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta or {})
@@ -516,19 +527,65 @@ class MemoryDB:
             )
             return cursor.rowcount
 
+    def set_session_title(self, session_id: str, title: str) -> None:
+        """Sets or updates the human-readable title for a session."""
+        now = time.time()
+        with self.conn:
+            self.conn.execute(
+                """
+                INSERT INTO session_metadata (session_id, title, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    title = excluded.title,
+                    updated_at = excluded.updated_at;
+                """,
+                (str(session_id), str(title).strip(), now),
+            )
+
+    def get_session_title(self, session_id: str) -> str | None:
+        """Retrieves custom session title if set."""
+        cursor = self.conn.execute(
+            "SELECT title FROM session_metadata WHERE session_id = ? LIMIT 1;",
+            (str(session_id),),
+        )
+        row = cursor.fetchone()
+        return row["title"] if row else None
+
     def list_active_sessions(self) -> list[dict[str, Any]]:
         """
-        Lists all recorded conversation sessions with turn counts and timestamps.
+        Lists all recorded conversation sessions with turn counts, timestamps, and titles.
         """
         cursor = self.conn.execute(
             """
-            SELECT session_id, COUNT(*) as turn_count, MIN(created_at) as started_at, MAX(created_at) as last_activity
-            FROM conversation_turns
-            GROUP BY session_id
+            SELECT 
+                ct.session_id, 
+                COUNT(*) as turn_count, 
+                MIN(ct.created_at) as started_at, 
+                MAX(ct.created_at) as last_activity,
+                sm.title as custom_title,
+                (SELECT content FROM conversation_turns WHERE session_id = ct.session_id AND role = 'user' ORDER BY created_at ASC LIMIT 1) as first_prompt
+            FROM conversation_turns ct
+            LEFT JOIN session_metadata sm ON sm.session_id = ct.session_id
+            GROUP BY ct.session_id
             ORDER BY last_activity DESC;
             """
         )
-        return [dict(r) for r in cursor.fetchall()]
+        results = []
+        for r in cursor.fetchall():
+            row_dict = dict(r)
+            custom_title = row_dict.pop("custom_title", None)
+            first_prompt = row_dict.pop("first_prompt", None)
+            if custom_title:
+                title = custom_title
+            elif first_prompt:
+                clean = " ".join(first_prompt.strip().split())
+                title = clean[:42] + ("..." if len(clean) > 42 else "")
+            else:
+                title = f"Chat {row_dict['session_id'][:12]}"
+            row_dict["title"] = title
+            row_dict["preview"] = (first_prompt[:80] + "...") if first_prompt else ""
+            results.append(row_dict)
+        return results
 
     def deduplicate_memories(self) -> int:
         """

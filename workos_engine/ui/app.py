@@ -1,5 +1,7 @@
-"""FastAPI Backend Server for WorkOS Minimalist Web UI."""
+"""FastAPI Backend Server for Argus OS Executive AI Web Interface."""
 
+import asyncio
+import json
 import logging
 import os
 import shutil
@@ -9,12 +11,13 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from config import WorkOSConfig, get_config
 from workos_engine import __version__
+from workos_engine.debug import get_tracer
 from workos_engine.infra_manager import (
     ensure_all_infrastructure,
     get_infrastructure_status,
@@ -39,8 +42,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="WorkOS — Executive AI Operating System",
-    description="Minimalist Autonomous Multi-Agent OS with 4-Network Memory & Document Vault",
+    title="Argus OS — Executive AI Operating System",
+    description="Executive Autonomous Multi-Agent AI Workspace with Live Telemetry & Mission Control",
     version=__version__,
     lifespan=lifespan,
 )
@@ -111,13 +114,122 @@ class EmailSendRequest(BaseModel):
     bcc: str | None = None
 
 
+class SessionTitleRequest(BaseModel):
+    title: str
+
+
+class DraftApproveRequest(BaseModel):
+    uid: str | None = None
+    to_email: str
+    subject: str
+    body: str
+
+
 # Routes
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     index_file = STATIC_DIR / "index.html"
     if index_file.exists():
         return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
-    return HTMLResponse("<h1>WorkOS Web UI</h1><p>static/index.html not found.</p>")
+    return HTMLResponse("<h1>Argus OS</h1><p>static/index.html not found.</p>")
+
+
+@app.get("/api/stats")
+async def get_workspace_stats():
+    """Aggregated executive workspace statistics and system intelligence."""
+    docs = get_vault().list_documents()
+    total_size = sum(d.file_size_bytes for d in docs)
+    parsed_count = sum(1 for d in docs if d.parsed_markdown_path and Path(d.parsed_markdown_path).exists())
+    total_tables = sum(d.table_count for d in docs)
+
+    active_beliefs = []
+    wings_count = 0
+    halls_count = 0
+    try:
+        active_beliefs = memory.get_active_beliefs()
+        loci_data = memory.db.get_loci_structure(active_only=True)
+        wings_count = len(loci_data)
+        halls_count = sum(len(h) for h in loci_data.values())
+    except Exception as e:
+        logger.debug(f"Error fetching memory stats: {e}")
+
+    ollama_client = getattr(planner, "client", None)
+    is_ollama_online = False
+    if ollama_client and hasattr(ollama_client, "is_available"):
+        is_ollama_online = ollama_client.is_available()
+
+    size_formatted = f"{(total_size / (1024 * 1024)):.2f} MB" if total_size > 1024 * 1024 else f"{(total_size / 1024):.1f} KB"
+
+    return {
+        "vault": {
+            "document_count": len(docs),
+            "parsed_count": parsed_count,
+            "table_count": total_tables,
+            "total_size_bytes": total_size,
+            "total_size_formatted": size_formatted,
+        },
+        "memory": {
+            "active_beliefs_count": len(active_beliefs),
+            "wings_count": wings_count,
+            "halls_count": halls_count,
+        },
+        "mail": {
+            "connected": bool(getattr(config, "imap_server", None)),
+            "autonomy_level": config.autonomy_level.value,
+        },
+        "system": {
+            "system_name": "Argus OS",
+            "version": __version__,
+            "model_name": config.model_name,
+            "num_ctx": config.num_ctx,
+            "ollama_online": is_ollama_online,
+        },
+    }
+
+
+@app.get("/api/stream/{session_id}")
+async def stream_subagent_events(session_id: str):
+    """
+    Real-time Server-Sent Events (SSE) stream yielding subagent thoughts,
+    tool calls, and execution milestones directly to the live Mission Control UI.
+    """
+    tracer = get_tracer()
+    queue = tracer.subscribe(session_id=session_id)
+
+    async def event_generator():
+        yield f"event: connected\ndata: {json.dumps({'status': 'connected', 'session_id': session_id})}\n\n"
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    event_data = event.to_dict()
+                    yield f"event: trace\ndata: {json.dumps(event_data)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            tracer.unsubscribe(queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.put("/api/session/{session_id}/title")
+async def update_session_title(session_id: str, req: SessionTitleRequest):
+    """Updates the human-readable title of a session."""
+    if not req.title.strip():
+        raise HTTPException(status_code=400, detail="Title cannot be empty")
+    clean_title = req.title.strip()
+    memory.set_session_title(session_id=session_id, title=clean_title)
+    return {"status": "success", "session_id": session_id, "title": clean_title}
 
 
 @app.get("/api/status")
@@ -662,6 +774,37 @@ async def send_mail_endpoint(req: EmailSendRequest):
         return res
     except Exception as e:
         logger.error(f"Failed to send email: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/mail/drafts")
+async def list_staged_drafts():
+    """Lists staged drafts in IMAP Drafts folder awaiting supervised approval."""
+    try:
+        drafts = []
+        if hasattr(planner.mail_agent, "toolkit") and hasattr(planner.mail_agent.toolkit, "search_emails"):
+            res = planner.mail_agent.toolkit.search_emails(folder="Drafts", text="")
+            drafts = res if isinstance(res, list) else res.get("emails", [])
+        return {"drafts": drafts, "count": len(drafts)}
+    except Exception as e:
+        logger.debug(f"Failed to fetch drafts: {e}")
+        return {"drafts": [], "count": 0}
+
+
+@app.post("/api/mail/drafts/approve")
+async def approve_staged_draft(req: DraftApproveRequest):
+    """Approves and transmits a staged email draft via SMTP."""
+    try:
+        if not hasattr(planner.mail_agent, "toolkit") or not hasattr(planner.mail_agent.toolkit, "send_email"):
+            raise HTTPException(status_code=500, detail="Mail agent toolkit not configured")
+        res = planner.mail_agent.toolkit.send_email(
+            to_email=req.to_email,
+            subject=req.subject,
+            body=req.body,
+        )
+        return {"status": "sent", "to_email": req.to_email, "result": res}
+    except Exception as e:
+        logger.error(f"Failed to transmit approved draft: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

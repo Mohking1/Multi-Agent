@@ -78,6 +78,7 @@ class ExecutionResult:
     data: Any = None
     error: str | None = None
     artifacts: list[str] = field(default_factory=list)
+    duration_ms: int | None = None
 
 
 @dataclass(frozen=True)
@@ -97,6 +98,7 @@ class PlanStep:
     output_data: dict[str, Any] = field(default_factory=dict)
     status: str = "pending"  # pending, in_progress, completed, failed
     result: ExecutionResult | None = None
+    duration_ms: int | None = None
 
 
 @dataclass

@@ -710,6 +710,7 @@ class ExecutivePlanner:
             )
 
             # 4. Dispatch to subagent
+            step_t0 = datetime.now()
             try:
                 if inspect.iscoroutinefunction(agent.execute):
                     res = await agent.execute(task)
@@ -717,6 +718,12 @@ class ExecutivePlanner:
                     res = agent.execute(task)
                     if inspect.iscoroutine(res):
                         res = await res
+                step_dur_ms = int((datetime.now() - step_t0).total_seconds() * 1000)
+                if hasattr(res, "duration_ms"):
+                    res.duration_ms = step_dur_ms
+                else:
+                    setattr(res, "duration_ms", step_dur_ms)
+                step.duration_ms = step_dur_ms
                 step.result = res
                 step.status = "completed" if res.success else "failed"
 
@@ -1065,28 +1072,91 @@ class ExecutivePlanner:
             )
 
             if intent == "AGENT_EXECUTION":
+                t_start = datetime.now()
                 plan = await self.run_goal(
                     message,
                     user_id=user_id,
                     session_id=session_id,
                     record_user_turn=False,
                 )
+                total_duration_ms = int((datetime.now() - t_start).total_seconds() * 1000)
+
+                # Aggregate citations produced across RAG, Web research, and synthesis
+                citations: list[dict[str, Any]] = []
+                for step in plan.steps:
+                    if step.result and isinstance(step.result.data, dict):
+                        if "citations" in step.result.data and isinstance(step.result.data["citations"], list):
+                            for cit in step.result.data["citations"]:
+                                if isinstance(cit, dict) and not any(
+                                    c.get("citation_id") == cit.get("citation_id") for c in citations
+                                ):
+                                    citations.append(cit)
+                    elif step.result and isinstance(step.result.data, list):
+                        for idx, r in enumerate(step.result.data, 1):
+                            if isinstance(r, dict) and (r.get("url") or r.get("title")):
+                                cit_id = f"[{idx}]"
+                                if not any(c.get("citation_id") == cit_id for c in citations):
+                                    citations.append(
+                                        {
+                                            "citation_id": cit_id,
+                                            "title": r.get("title", f"Source {idx}"),
+                                            "filename": r.get("title", f"Source {idx}"),
+                                            "url": r.get("url", ""),
+                                            "snippet": r.get("snippet", ""),
+                                            "score": r.get("score", 1.0),
+                                        }
+                                    )
+                    if step.result and isinstance(step.result.artifacts, list):
+                        for art in step.result.artifacts:
+                            if isinstance(art, dict) and "citation_id" in art:
+                                if not any(c.get("citation_id") == art.get("citation_id") for c in citations):
+                                    citations.append(art)
+
+                # Also parse citations from final output if present
+                if plan.final_output:
+                    for m in re.finditer(r"\[(\d+)\]\s*([^\n\r]+)", plan.final_output):
+                        cit_id = f"[{m.group(1)}]"
+                        if not any(c.get("citation_id") == cit_id for c in citations):
+                            line_content = m.group(2).strip()
+                            url_match = re.search(r"https?://[^\s\)]+", line_content)
+                            url = url_match.group(0) if url_match else ""
+                            title = line_content.replace(url, "").strip(" -–—:") if url else line_content
+                            citations.append(
+                                {
+                                    "citation_id": cit_id,
+                                    "title": title or line_content,
+                                    "filename": title or line_content,
+                                    "url": url,
+                                    "snippet": line_content,
+                                    "score": 1.0,
+                                }
+                            )
+
                 return {
                     "type": "plan_execution",
                     "message": plan.final_output or "Executed goal across specialist agents.",
+                    "duration_ms": total_duration_ms,
+                    "citations": citations,
                     "plan": {
                         "goal": plan.goal,
                         "final_output": plan.final_output,
+                        "status": "completed"
+                        if all(s.status == "completed" for s in plan.steps)
+                        else "completed_with_issues",
                         "steps": [
                             {
                                 "step_id": s.step_id,
                                 "description": s.description,
                                 "assigned_agent": s.assigned_agent,
                                 "status": s.status,
+                                "duration_ms": getattr(s, "duration_ms", None)
+                                or (s.result.duration_ms if s.result else None),
                                 "result": {
                                     "success": s.result.success if s.result else False,
                                     "data": s.result.data if s.result else None,
                                     "error": s.result.error if s.result else None,
+                                    "artifacts": s.result.artifacts if s.result else [],
+                                    "duration_ms": s.result.duration_ms if s.result else None,
                                 }
                                 if s.result
                                 else None,
@@ -1098,18 +1168,19 @@ class ExecutivePlanner:
                 }
 
             # Conversational / Assistant branch with deep cognitive grounding
+            t_conv_start = datetime.now()
             cognitive_context = self.build_planning_context(message, session_id=session_id)
             today_str = datetime.now().strftime("%Y-%m-%d")
 
             system_prompt = (
-                "You are WorkOS, an autonomous executive AI operating system and intelligent assistant.\n"
+                "You are Argus OS, an autonomous executive AI operating system and intelligent assistant.\n"
                 f"Current System Date: {today_str}\n\n"
                 "Persona & Behavioral Rules:\n"
                 "- Articulate, executive, highly capable, and attentive.\n"
                 "- Ground all your answers strictly in the user's stored beliefs, preferences, and recalled knowledge provided in the context.\n"
                 "- If the user asks about their preferences, background, past decisions, or stored knowledge, recall and answer accurately from memory.\n"
                 "- If the user asks for multi-domain actions (searching email, parsing documents, scraping web), summarize and offer to run the workflow.\n"
-                "- Keep conversational responses clean, readable, and well-structured."
+                "- Keep conversational responses clean, readable, and well-structured with clear markdown formatting."
             )
             user_prompt = (
                 f"User Message:\n'{message}'\n\n"
@@ -1127,7 +1198,9 @@ class ExecutivePlanner:
                 response = response.strip()
             except Exception as e:
                 logger.warning(f"Conversational generation error: {e}")
-                response = f"I'm here as your WorkOS executive assistant. (System note: {e})"
+                response = f"I'm here as your Argus OS executive assistant. (System note: {e})"
+
+            conv_duration_ms = int((datetime.now() - t_conv_start).total_seconds() * 1000)
 
             # Record assistant response in session drawer
             self.memory.add_turn(session_id=session_id, role="assistant", content=response)
@@ -1145,6 +1218,7 @@ class ExecutivePlanner:
             return {
                 "type": "conversation",
                 "message": response,
+                "duration_ms": conv_duration_ms,
                 "session_id": session_id,
             }
         except Exception as e:

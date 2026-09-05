@@ -1,0 +1,239 @@
+/* Argus OS — Executive Design Tokens & Component Styling */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* Surfaces */
+  --bg-canvas: #09090B;
+  --bg-surface-1: #121215;
+  --bg-surface-2: #18181B;
+  --bg-surface-3: #222227;
+
+  /* Borders */
+  --border-subtle: #27272A;
+  --border-muted: #1E1E22;
+  --border-active: #6366F1;
+
+  /* Typography */
+  --text-primary: #FAFAFA;
+  --text-secondary: #A1A1AA;
+  --text-muted: #71717A;
+
+  /* Brand Accents */
+  --brand-primary: #6366F1;
+  --brand-primary-hover: #4F46E5;
+  --brand-accent: #06B6D4;
+  --brand-glow: rgba(99, 102, 241, 0.15);
+
+  /* Functional Status */
+  --status-success: #10B981;
+  --status-warning: #F59E0B;
+  --status-danger: #EF4444;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code, pre, .font-mono {
+  font-family: 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272A;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3F3F46;
+}
+
+/* Prose Typography & Content Rendering */
+.prose-argus {
+  color: #E4E4E7;
+  font-size: 0.9375rem;
+  line-height: 1.68;
+  letter-spacing: -0.01em;
+}
+
+.prose-argus p {
+  margin-bottom: 0.85rem;
+}
+.prose-argus p:last-child {
+  margin-bottom: 0;
+}
+
+.prose-argus h1, .prose-argus h2, .prose-argus h3, .prose-argus h4 {
+  color: #FAFAFA;
+  font-weight: 600;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.prose-argus h1 {
+  font-size: 1.35rem;
+}
+
+.prose-argus h2 {
+  font-size: 1.15rem;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 0.35rem;
+}
+
+.prose-argus h3 {
+  font-size: 1rem;
+}
+
+.prose-argus ul, .prose-argus ol {
+  margin: 0.75rem 0;
+  padding-left: 1.35rem;
+}
+
+.prose-argus ul {
+  list-style-type: disc;
+}
+
+.prose-argus ol {
+  list-style-type: decimal;
+}
+
+.prose-argus li {
+  margin-bottom: 0.35rem;
+}
+
+.prose-argus strong {
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.prose-argus pre {
+  background-color: #0E0E12;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 0.875rem 1rem;
+  margin: 0.875rem 0;
+  overflow-x: auto;
+  font-size: 0.8125rem;
+}
+
+.prose-argus pre code {
+  background: none;
+  padding: 0;
+  border: none;
+  font-size: 0.8125rem;
+  color: #38BDF8;
+}
+
+.prose-argus code:not(pre code) {
+  background-color: #1A1A20;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.15rem 0.4rem;
+  border-radius: 5px;
+  font-size: 0.8125rem;
+  color: #A5B4FC;
+}
+
+.prose-argus blockquote {
+  border-left: 3px solid var(--brand-primary);
+  padding: 0.5rem 1rem;
+  margin: 0.85rem 0;
+  color: #A1A1AA;
+  background: rgba(99, 102, 241, 0.05);
+  border-radius: 0 6px 6px 0;
+}
+
+/* Data Tables in Prose */
+.prose-argus table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.8125rem;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+
+.prose-argus th, .prose-argus td {
+  border: 1px solid var(--border-subtle);
+  padding: 0.55rem 0.85rem;
+  text-align: left;
+}
+
+.prose-argus th {
+  background-color: #15151A;
+  color: #A5B4FC;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.prose-argus tr:hover td {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* Keyframe Animations */
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.15);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* Live Ticker Shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer-bg {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2.5s infinite;
+}
