@@ -95,7 +95,11 @@ class MemoryReflector:
             if belief_match and role in ["user", "system"]:
                 pref_text = text.strip()
                 wing, hall = "workflows", "preferences"
-                key = "summary_format" if "format" in pref_text.lower() else "user_preference"
+                raw_slug_words = re.findall(r"[a-zA-Z0-9]+", pref_text.lower())
+                stop_words = {"always", "prefer", "prefers", "please", "use", "my", "the", "a", "an", "is", "in", "to", "for", "your", "our"}
+                content_words = [w for w in raw_slug_words if w not in stop_words]
+                slug = "_".join(content_words[:3]) if content_words else "general"
+                key = f"pref_{slug}"
                 items.append(
                     MemoryItem(
                         id=f"mem_{uuid.uuid4().hex[:12]}",
@@ -154,62 +158,90 @@ class MemoryReflector:
                     )
                 )
 
+            # 4. User profile / domain context extraction
+            profile_match = re.search(
+                r"(?:my name is|i am applying to|i am working on|i live in|my email is|call me)\s+([^\.\n]+)",
+                text,
+                re.IGNORECASE,
+            )
+            if profile_match and role in ["user", "system"]:
+                content = text.strip()
+                wing, hall = "people", "contacts"
+                sub_words = re.findall(r"\w+", profile_match.group(1).lower())
+                key = "user_profile_" + ("_".join(sub_words[:2]) if sub_words else "info")
+                items.append(
+                    MemoryItem(
+                        id=f"mem_{uuid.uuid4().hex[:12]}",
+                        network=MemoryNetwork.FACTS,
+                        wing=wing,
+                        hall=hall,
+                        key=key,
+                        content=content,
+                        confidence=0.9,
+                        metadata={"source": "user_dialogue"},
+                    )
+                )
+
         return items
+
+    # Compatibility alias
+    _reflect_rule_based = _reflect_heuristically
 
     def _reflect_with_model(
         self, conversation_events: list[Any], model_client: Any
     ) -> list[MemoryItem]:
         """
-        Uses Ollama LLM to extract structured memories.
+        Uses local Ollama LLM to extract structured memories across the 4 Hindsight networks.
         """
+        from workos_engine.llm_client import extract_and_parse_json
+
         events_json = json.dumps(
             [e if isinstance(e, (dict, str)) else str(e) for e in conversation_events]
         )
-        prompt = f"""
+        prompt = f"""You are the WorkOS Cognitive Memory Reflector.
 Analyze the following conversation events and extract structured memory items to retain.
-Categorize each into one of 4 networks:
-- 'facts': Permanent factual knowledge (people's roles, system configs, facts)
-- 'experiences': Specific episodic execution logs or task results
-- 'entities': Named entities (people, tools, projects)
-- 'beliefs': Working assumptions, user preferences, formatting rules
+Categorize each item into one of the 4 Hindsight networks:
+- 'facts': Permanent objective knowledge (system configs, world facts, credentials, specs)
+- 'experiences': Episodic execution logs, task results, and actions taken
+- 'entities': Named entities (people, tools, institutions, universities, projects)
+- 'beliefs': Working assumptions, user preferences, mental models, formatting rules
 
 Spatial Loci organization:
 - wing: 'people', 'projects', 'workflows', 'knowledge', or 'general'
-- hall: specific room (e.g., 'contacts', 'decisions', 'preferences', 'runs')
+- hall: specific topic corridor (e.g., 'contacts', 'preferences', 'decisions', 'runs', 'admissions')
 
-Events:
+Events to analyze:
 {events_json}
 
-Return ONLY valid JSON array with objects matching:
+Return strictly a JSON array of memory objects in this format:
 [
   {{
     "network": "facts|experiences|entities|beliefs",
-    "wing": "...",
-    "hall": "...",
-    "key": "...",
-    "content": "...",
+    "wing": "workflows",
+    "hall": "preferences",
+    "key": "unique_semantic_key",
+    "content": "clear, concise declarative statement",
     "confidence": 1.0,
     "metadata": {{}}
   }}
 ]
 """
-        if hasattr(model_client, "generate"):
-            resp_text = model_client.generate(prompt=prompt, format="json").strip()
-        elif hasattr(model_client, "models"):
-            response = model_client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
-            )
-            resp_text = response.text.strip()
-        else:
-            return self._reflect_rule_based(conversation_events)
+        resp_text = ""
+        try:
+            if hasattr(model_client, "generate"):
+                resp_text = model_client.generate(prompt=prompt, format="json").strip()
+            elif hasattr(model_client, "chat"):
+                resp_text = model_client.chat(
+                    [{"role": "user", "content": prompt}], format="json"
+                ).strip()
+            else:
+                return self._reflect_heuristically(conversation_events)
+        except Exception as e:
+            logger.warning(f"Model reflection call failed, falling back to heuristics: {e}")
+        parsed = extract_and_parse_json(resp_text)
+        if not parsed:
+            return self._reflect_heuristically(conversation_events)
 
-        # Clean potential markdown code fences
-        if resp_text.startswith("```"):
-            resp_text = re.sub(r"^```(?:json)?\n?", "", resp_text)
-            resp_text = re.sub(r"\n?```$", "", resp_text)
-
-        parsed = json.loads(resp_text)
         if isinstance(parsed, dict):
             parsed_list = (
                 parsed.get("memories") or parsed.get("items") or parsed.get("data") or [parsed]
@@ -224,19 +256,44 @@ Return ONLY valid JSON array with objects matching:
             if not isinstance(p, dict) or "network" not in p:
                 continue
             try:
-                network_val = p["network"].lower().strip()
+                network_val = str(p["network"]).lower().strip()
+                raw_content = p.get("content", "")
+                content_str = (
+                    json.dumps(raw_content)
+                    if isinstance(raw_content, (dict, list))
+                    else str(raw_content).strip()
+                )
+                if not content_str:
+                    continue
+
+                raw_key = p.get("key", "item")
+                key_str = "_".join(re.findall(r"\w+", str(raw_key).lower())) or "item"
+                raw_conf = p.get("confidence", 1.0)
+                try:
+                    conf_val = float(raw_conf)
+                except (ValueError, TypeError):
+                    conf_val = 1.0
+
+                raw_meta = p.get("metadata", {})
+                meta_val = raw_meta if isinstance(raw_meta, dict) else {}
+
                 items.append(
                     MemoryItem(
                         id=f"mem_{uuid.uuid4().hex[:12]}",
                         network=MemoryNetwork(network_val),
-                        wing=p.get("wing", "general"),
-                        hall=p.get("hall", "general"),
-                        key=p.get("key", "item"),
-                        content=p.get("content", ""),
-                        confidence=float(p.get("confidence", 1.0)),
-                        metadata=p.get("metadata", {}),
+                        wing=str(p.get("wing", "general")).strip().lower(),
+                        hall=str(p.get("hall", "general")).strip().lower(),
+                        key=key_str,
+                        content=content_str,
+                        confidence=conf_val,
+                        metadata=meta_val,
                     )
                 )
             except Exception as e:
                 logger.debug(f"Skipping invalid memory item {p}: {e}")
+
+        # If model extraction returned empty, supplement with heuristic extraction
+        if not items:
+            items = self._reflect_heuristically(conversation_events)
+
         return items

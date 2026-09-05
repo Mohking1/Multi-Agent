@@ -1,3 +1,4 @@
+import re
 import uuid
 from typing import Any
 
@@ -5,7 +6,7 @@ from config import WorkOSConfig, get_config
 from workos_engine.memory.db import MemoryDB
 from workos_engine.memory.loci import SpatialLociManager
 from workos_engine.memory.reflect import MemoryReflector
-from workos_engine.types import MemoryItem, MemoryNetwork
+from workos_engine.types import ConversationTurn, MemoryItem, MemoryNetwork
 
 
 class CognitiveMemoryEngine:
@@ -60,8 +61,21 @@ class CognitiveMemoryEngine:
     ) -> str:
         """
         Retains an episodic experience or execution log in the Experiences network.
+        Prevents inserting duplicate experience records with identical content.
         """
         norm_wing, norm_hall = self.loci.normalize_locus(wing, hall)
+        try:
+            cursor = self.db.conn.cursor()
+            cursor.execute(
+                "SELECT id FROM memories WHERE network = ? AND (key = ? OR content = ?) AND superseded_by IS NULL",
+                (MemoryNetwork.EXPERIENCES.value, key.strip(), content.strip()),
+            )
+            existing = cursor.fetchone()
+            if existing:
+                return existing[0]
+        except Exception:
+            pass
+
         item = MemoryItem(
             id=f"mem_{uuid.uuid4().hex[:12]}",
             network=MemoryNetwork.EXPERIENCES,
@@ -197,6 +211,96 @@ class CognitiveMemoryEngine:
             conversation_events=conversation_events,
             model_client=model_client,
         )
+
+    def add_turn(
+        self,
+        session_id: str,
+        role: str,
+        content: Any,
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """
+        Records a verbatim conversation turn into the session drawer (MemPalace pattern).
+        Strips any model reasoning <think> blocks before storage.
+        """
+        cleaned_content = content
+        if isinstance(content, str):
+            cleaned_content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+
+        return self.db.add_conversation_turn(
+            session_id=session_id, role=role, content=cleaned_content, metadata=metadata
+        )
+
+    def get_session_dialogue(self, session_id: str, limit: int = 15) -> list[ConversationTurn]:
+        """
+        Retrieves ordered dialogue turns for the given session.
+        """
+        return self.db.get_conversation_turns(session_id=session_id, limit=limit)
+
+    def clear_session(self, session_id: str) -> int:
+        """
+        Clears conversation turns for a session.
+        """
+        return self.db.clear_session_turns(session_id=session_id)
+
+    def list_sessions(self) -> list[dict[str, Any]]:
+        """
+        Lists all active sessions with turn counts.
+        """
+        return self.db.list_active_sessions()
+
+    def deduplicate(self) -> int:
+        """
+        Cleans up duplicate memories from database.
+        """
+        return self.db.deduplicate_memories()
+
+    def reflect_context(
+        self,
+        query: str,
+        session_id: str | None = None,
+        limit_memories: int = 5,
+        limit_turns: int = 6,
+    ) -> str:
+        """
+        Synthesizes narrative conversational and cognitive context (Hindsight Reflect pattern).
+        Combines:
+        1. Recent verbatim dialogue history from the active session.
+        2. Active user beliefs & mental models.
+        3. Recalled facts, entities, and past experiences.
+        """
+        sections: list[str] = []
+
+        # 1. Multi-turn dialogue history
+        if session_id:
+            turns = self.get_session_dialogue(session_id=session_id, limit=limit_turns)
+            if turns:
+                dialogue_lines = [f"{t.role.capitalize()}: {t.content}" for t in turns]
+                sections.append("Recent Conversation History:\n" + "\n".join(dialogue_lines))
+
+        # 2. Active beliefs (Mental Models)
+        try:
+            beliefs = self.get_active_beliefs()
+            if beliefs:
+                belief_lines = [
+                    f"- [{b.wing}/{b.hall}] {b.key}: {b.content[:150]}" for b in beliefs
+                ]
+                sections.append("User Beliefs & System Preferences:\n" + "\n".join(belief_lines))
+        except Exception:
+            pass
+
+        # 3. Recalled facts and relevant experiences (Recall Grounding)
+        try:
+            recalled = self.recall(query=query, limit=limit_memories)
+            if recalled:
+                mem_lines = [f"- [{m.network.value}:{m.key}] {m.content[:200]}" for m in recalled]
+                sections.append(
+                    "Recalled Grounded Knowledge & Experiences:\n" + "\n".join(mem_lines)
+                )
+        except Exception:
+            pass
+
+        return "\n\n".join(sections)
 
     def close(self):
         """

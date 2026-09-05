@@ -15,7 +15,7 @@ except ImportError:
     trafilatura = None
 
 try:
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
 except ImportError:
     DDGS = None
 

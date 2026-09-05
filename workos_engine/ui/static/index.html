@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WorkOS — Executive AI Cockpit</title>
+  <title>WorkOS — Executive AI Operating System</title>
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -13,865 +14,1104 @@
         extend: {
           colors: {
             brand: {
-              cyan: '#00E5FF',
-              violet: '#8B5CF6',
-              emerald: '#10B981',
+              teal: '#0D9488',
+              tealLight: '#14B8A6',
               amber: '#F59E0B',
-              rose: '#F43F5E',
+              coral: '#EA580C',
+              emerald: '#10B981',
+              rose: '#EF4444',
             },
-            obsidian: {
-              base: '#070A0F',
-              card: '#0D1117',
-              hover: '#161B22',
-              border: '#21262D',
-              subtle: '#30363D',
+            zinc: {
+              850: '#1F1F23',
+              900: '#18181B',
+              950: '#09090B',
             }
           },
           fontFamily: {
             sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-            mono: ['JetBrains Mono', 'monospace'],
+            mono: ['JetBrains Mono', 'Menlo', 'monospace'],
           }
         }
       }
     }
   </script>
+
   <!-- Alpine.js -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <!-- FontAwesome 6 -->
+  <!-- Phosphor / FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <!-- Marked.js Markdown Engine -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <!-- Highlight.js for Syntax Highlighting -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <!-- KaTeX LaTeX Math Engine -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-    body { font-family: 'Inter', sans-serif; background-color: #070A0F; }
-    code, pre { font-family: 'JetBrains Mono', monospace; }
-    .prose-dark { color: #E6EDF3; }
-    .prose-dark h1, .prose-dark h2, .prose-dark h3, .prose-dark h4 { color: #F0F6FC; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.5rem; }
-    .prose-dark h2 { font-size: 1.25rem; border-bottom: 1px solid #21262D; padding-bottom: 0.35rem; }
-    .prose-dark h3 { font-size: 1.05rem; }
-    .prose-dark table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.8125rem; border-radius: 6px; overflow: hidden; }
-    .prose-dark th, .prose-dark td { border: 1px solid #21262D; padding: 0.5rem 0.75rem; text-align: left; }
-    .prose-dark th { background-color: #161B22; color: #00E5FF; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; text-transform: uppercase; }
-    .prose-dark tr:hover td { background-color: rgba(22, 27, 34, 0.5); }
-    .prose-dark ul { list-style-type: disc; margin-left: 1.25rem; margin-bottom: 0.75rem; }
-    .prose-dark ol { list-style-type: decimal; margin-left: 1.25rem; margin-bottom: 0.75rem; }
-    .prose-dark p { margin-bottom: 0.75rem; }
-    .prose-dark pre { background-color: #0D1117; border: 1px solid #21262D; border-radius: 8px; padding: 0.875rem 1rem; margin: 0.875rem 0; overflow-x: auto; }
-    .prose-dark pre code { background-color: transparent; border: none; padding: 0; font-size: 0.8125rem; line-height: 1.5; color: #79C0FF; }
-    .prose-dark code:not(pre code) { background-color: #161B22; border: 1px solid #30363D; padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.8125rem; color: #00E5FF; }
-    .prose-dark blockquote { border-left: 3px solid #00E5FF; padding-left: 1rem; margin: 0.75rem 0; color: #8B949E; font-style: italic; background: rgba(0, 229, 255, 0.03); padding-top: 0.25rem; padding-bottom: 0.25rem; border-radius: 0 4px 4px 0; }
-    .prose-dark hr { border-color: #21262D; margin: 1.25rem 0; }
     
-    /* KaTeX Mathematical Formatting */
-    .katex { font-size: 1.1em; color: #F0F6FC; }
-    .katex-display-wrapper {
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #09090B;
+      color: #FAFAFA;
+    }
+    code, pre, .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #27272A;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3F3F46;
+    }
+
+    /* Markdown prose styles */
+    .prose-workos {
+      color: #E4E4E7;
+      font-size: 0.9375rem;
+      line-height: 1.65;
+    }
+    .prose-workos p {
+      margin-bottom: 0.75rem;
+    }
+    .prose-workos p:last-child {
+      margin-bottom: 0;
+    }
+    .prose-workos h1, .prose-workos h2, .prose-workos h3, .prose-workos h4 {
+      color: #FAFAFA;
+      font-weight: 600;
+      margin-top: 1.25rem;
+      margin-bottom: 0.5rem;
+    }
+    .prose-workos h2 {
+      font-size: 1.15rem;
+      border-bottom: 1px solid #27272A;
+      padding-bottom: 0.35rem;
+    }
+    .prose-workos ul, .prose-workos ol {
+      margin: 0.75rem 0;
+      padding-left: 1.25rem;
+    }
+    .prose-workos ul {
+      list-style-type: disc;
+    }
+    .prose-workos ol {
+      list-style-type: decimal;
+    }
+    .prose-workos li {
+      margin-bottom: 0.35rem;
+    }
+    .prose-workos pre {
+      background-color: #121215;
+      border: 1px solid #27272A;
+      border-radius: 6px;
+      padding: 0.875rem 1rem;
       margin: 0.875rem 0;
       overflow-x: auto;
-      background: rgba(13, 17, 23, 0.8);
-      border: 1px solid rgba(0, 229, 255, 0.2);
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      text-align: center;
     }
-    .katex-display-wrapper:hover {
-      border-color: rgba(0, 229, 255, 0.5);
+    .prose-workos pre code {
+      background: none;
+      padding: 0;
+      border: none;
+      font-size: 0.8125rem;
+      color: #38BDF8;
     }
-    
-    .citation-tag {
-      cursor: pointer;
-      color: #00E5FF;
-      background: rgba(0, 229, 255, 0.12);
-      padding: 1px 5px;
+    .prose-workos code:not(pre code) {
+      background-color: #1F1F23;
+      border: 1px solid #27272A;
+      padding: 0.1rem 0.35rem;
       border-radius: 4px;
-      font-weight: 600;
+      font-size: 0.8125rem;
+      color: #2DD4BF;
+    }
+    .prose-workos blockquote {
+      border-left: 3px solid #0D9488;
+      padding-left: 0.875rem;
+      margin: 0.75rem 0;
+      color: #A1A1AA;
+      background: rgba(13, 148, 136, 0.05);
+      border-radius: 0 4px 4px 0;
+      padding-top: 0.25rem;
+      padding-bottom: 0.25rem;
+    }
+    .prose-workos table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.875rem 0;
+      font-size: 0.8125rem;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .prose-workos th, .prose-workos td {
+      border: 1px solid #27272A;
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+    .prose-workos th {
+      background-color: #18181B;
+      color: #14B8A6;
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.75rem;
-      border: 1px solid rgba(0, 229, 255, 0.3);
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      display: inline-flex;
-      align-items: center;
-      margin: 0 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
-    .citation-tag:hover {
-      background: rgba(0, 229, 255, 0.25);
-      border-color: #00E5FF;
-      transform: translateY(-1px);
-      box-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
+    .prose-workos tr:hover td {
+      background-color: rgba(24, 24, 27, 0.6);
     }
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
-    ::-webkit-scrollbar-track { background: #070A0F; }
-    ::-webkit-scrollbar-thumb { background: #21262D; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #30363D; }
-    .glow-cyan { box-shadow: 0 0 15px -3px rgba(0, 229, 255, 0.25); }
-    .glow-violet { box-shadow: 0 0 15px -3px rgba(139, 92, 246, 0.25); }
   </style>
 </head>
-<body class="text-gray-200 min-h-screen flex flex-col antialiased selection:bg-brand-cyan selection:text-black" x-data="workosCockpit()">
 
-  <!-- ==================== TOP NAVIGATION & TELEMETRY ==================== -->
-  <header class="border-b border-obsidian-border bg-obsidian-card/90 backdrop-blur-md sticky top-0 z-50">
-    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-      <!-- Logo & Subsystem Pill -->
-      <div class="flex items-center space-x-3">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-cyan via-blue-600 to-brand-violet flex items-center justify-center shadow-lg shadow-cyan-500/20">
-          <i class="fa-solid fa-layer-group text-black font-bold text-sm"></i>
+<body class="bg-zinc-950 text-zinc-100 h-screen flex flex-col antialiased overflow-hidden" x-data="workosApp()" x-init="initApp()">
+
+  <!-- Top Executive Header -->
+  <header class="h-14 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md shrink-0 px-5 flex items-center justify-between z-30">
+    <!-- Brand & Status -->
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
+        <div class="w-7 h-7 rounded-md bg-teal-600/20 border border-teal-500/40 flex items-center justify-center text-teal-400 font-bold text-sm">
+          <i class="fa-solid fa-layer-group text-xs"></i>
         </div>
-        <div class="flex items-baseline space-x-2">
-          <span class="font-bold text-base tracking-tight bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">WorkOS</span>
-          <span class="text-[10px] font-mono text-brand-cyan uppercase px-1.5 py-0.5 rounded bg-cyan-950/50 border border-cyan-800/40">Executive Cockpit</span>
-        </div>
+        <span class="font-semibold text-sm tracking-tight text-white">WorkOS</span>
       </div>
+      <span class="text-zinc-600 text-xs">/</span>
+      <span class="text-xs text-zinc-400 font-medium hidden sm:inline">Executive AI Operating System</span>
+      <span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-zinc-800 text-zinc-300 border border-zinc-700">100% Offline</span>
+    </div>
 
-      <!-- Navigation Tabs -->
-      <nav class="hidden md:flex items-center space-x-1">
-        <button @click="activeTab = 'cockpit'" :class="activeTab === 'cockpit' ? 'bg-obsidian-hover text-brand-cyan border-b-2 border-brand-cyan' : 'text-gray-400 hover:text-gray-200 hover:bg-obsidian-hover/50'" class="px-3.5 py-2 text-xs font-medium transition-all flex items-center space-x-2">
-          <i class="fa-solid fa-gauge-high text-xs"></i>
-          <span>Workspace Cockpit</span>
-        </button>
-        <button @click="activeTab = 'vault'" :class="activeTab === 'vault' ? 'bg-obsidian-hover text-brand-cyan border-b-2 border-brand-cyan' : 'text-gray-400 hover:text-gray-200 hover:bg-obsidian-hover/50'" class="px-3.5 py-2 text-xs font-medium transition-all flex items-center space-x-2">
-          <i class="fa-solid fa-vault text-xs"></i>
-          <span>Document Vault</span>
-          <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-obsidian-border text-gray-300 font-mono" x-text="status.documents_count"></span>
-        </button>
-        <button @click="activeTab = 'memory'" :class="activeTab === 'memory' ? 'bg-obsidian-hover text-brand-cyan border-b-2 border-brand-cyan' : 'text-gray-400 hover:text-gray-200 hover:bg-obsidian-hover/50'" class="px-3.5 py-2 text-xs font-medium transition-all flex items-center space-x-2">
-          <i class="fa-solid fa-brain text-xs"></i>
-          <span>Cognitive Palace</span>
-        </button>
-        <button @click="activeTab = 'mail'" :class="activeTab === 'mail' ? 'bg-obsidian-hover text-brand-cyan border-b-2 border-brand-cyan' : 'text-gray-400 hover:text-gray-200 hover:bg-obsidian-hover/50'" class="px-3.5 py-2 text-xs font-medium transition-all flex items-center space-x-2">
-          <i class="fa-solid fa-envelope text-xs"></i>
-          <span>Mail Hub</span>
-        </button>
-      </nav>
-
-      <!-- Telemetry Controls -->
-      <div class="flex items-center space-x-3">
-        <!-- Ollama Model Selector -->
-        <div class="flex items-center space-x-2 px-2.5 py-1 rounded-md bg-obsidian-base border border-obsidian-border text-xs">
-          <span class="w-2 h-2 rounded-full" :class="status.ollama_online ? 'bg-brand-emerald animate-pulse shadow-sm shadow-emerald-400' : 'bg-brand-rose'"></span>
-          <span class="text-gray-500 font-mono text-[11px]">Ollama:</span>
-          <select x-model="status.model_name" @change="switchModel($event.target.value)" class="bg-transparent border-none text-gray-200 font-mono text-xs focus:ring-0 cursor-pointer pr-1">
-            <template x-for="m in status.available_models" :key="m">
-              <option :value="m" x-text="m" class="bg-obsidian-card text-gray-200"></option>
-            </template>
-          </select>
+    <!-- Active Model & System Controls -->
+    <div class="flex items-center gap-3">
+      <!-- Prominent Model Switcher Button -->
+      <button @click="showModelModal = true" class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-zinc-900 border border-teal-500/30 hover:border-teal-500/60 text-xs text-zinc-200 transition shadow-sm group">
+        <div class="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></div>
+        <div class="flex flex-col text-left">
+          <span class="font-mono text-[11px] font-semibold text-teal-300" x-text="formatModelName(status.model_name)"></span>
+          <span class="text-[9px] text-zinc-400 font-mono">12,288 Context (GTX 1650 Sweet Spot)</span>
         </div>
+        <i class="fa-solid fa-chevron-down text-[10px] text-zinc-500 group-hover:text-teal-400 ml-1 transition"></i>
+      </button>
 
-        <!-- Autonomy Policy Toggle -->
-        <button 
-          @click="togglePolicy()" 
-          title="Click to toggle Autonomy: SUPERVISED (Prompt before sensitive actions) vs FULL (Autonomous)"
-          class="flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-mono font-medium transition-all border cursor-pointer select-none hover:opacity-90 active:scale-95 shadow-sm"
-          :class="status.autonomy_level === 'FULL' ? 'bg-emerald-950/80 text-brand-emerald border-emerald-600 shadow-emerald-900/30' : 'bg-amber-950/80 text-brand-amber border-amber-600 shadow-amber-900/30'">
-          <i class="fa-solid text-[11px]" :class="status.autonomy_level === 'FULL' ? 'fa-bolt text-brand-emerald' : 'fa-hand text-brand-amber'"></i>
-          <span x-text="status.autonomy_level === 'FULL' ? 'AUTONOMOUS' : 'SUPERVISED'"></span>
-        </button>
-      </div>
+      <!-- Autonomy Policy Pill -->
+      <button @click="togglePolicy()" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium transition"
+        :class="status.autonomy_level === 'FULL' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'">
+        <i class="fa-solid" :class="status.autonomy_level === 'FULL' ? 'fa-bolt text-[10px]' : 'fa-shield-halved text-[10px]'"></i>
+        <span class="text-[11px]" x-text="status.autonomy_level"></span>
+      </button>
+
+      <!-- Refresh Sessions -->
+      <button @click="loadSessions()" title="Refresh Session History" class="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition">
+        <i class="fa-solid fa-rotate-right text-xs"></i>
+      </button>
     </div>
   </header>
 
-  <!-- ==================== MAIN WORKSPACE ==================== -->
-  <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 space-y-6">
+  <!-- Main Multi-Column Viewport -->
+  <div class="flex-1 flex overflow-hidden">
 
-    <!-- ==================== TAB 1: EXECUTIVE COCKPIT (SPLIT CANVAS) ==================== -->
-    <div x-show="activeTab === 'cockpit'" class="space-y-5" x-transition>
-      
-      <!-- Top Command & Directive Bar -->
-      <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-2xl relative overflow-hidden">
-        <div class="absolute -top-32 -right-32 w-80 h-80 bg-brand-cyan/5 rounded-full blur-3xl pointer-events-none"></div>
+    <!-- Left Navigation Bar (Fixed) -->
+    <aside class="w-56 border-r border-zinc-800/80 bg-zinc-950 flex flex-col justify-between p-3 shrink-0 select-none">
+      <div class="space-y-1">
+        <div class="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Navigation</div>
+        
+        <button @click="activeTab = 'chat'" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition"
+          :class="activeTab === 'chat' ? 'bg-zinc-850 text-white border border-zinc-700/60 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'">
+          <i class="fa-solid fa-message w-4 text-teal-400"></i>
+          <span>Assistant Chat</span>
+        </button>
 
-        <div class="flex items-center justify-between mb-2.5">
-          <div class="flex items-center space-x-2">
-            <i class="fa-solid fa-terminal text-brand-cyan text-xs"></i>
-            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Executive Directive</span>
+        <button @click="activeTab = 'dag'" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition"
+          :class="activeTab === 'dag' ? 'bg-zinc-850 text-white border border-zinc-700/60 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'">
+          <i class="fa-solid fa-diagram-project w-4 text-sky-400"></i>
+          <span>Operations DAG</span>
+          <span x-show="currentPlan && currentPlan.steps && currentPlan.steps.length" class="ml-auto px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-800 text-zinc-400" x-text="currentPlan ? currentPlan.steps.length : ''"></span>
+        </button>
+
+        <button @click="activeTab = 'memory'" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition"
+          :class="activeTab === 'memory' ? 'bg-zinc-850 text-white border border-zinc-700/60 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'">
+          <i class="fa-solid fa-brain w-4 text-purple-400"></i>
+          <span>Memory Palace</span>
+          <span class="ml-auto px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-800 text-zinc-400" x-text="status.active_beliefs_count"></span>
+        </button>
+
+        <button @click="activeTab = 'vault'" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition"
+          :class="activeTab === 'vault' ? 'bg-zinc-850 text-white border border-zinc-700/60 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'">
+          <i class="fa-solid fa-folder-closed w-4 text-amber-400"></i>
+          <span>Document Vault</span>
+          <span class="ml-auto px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-800 text-zinc-400" x-text="vaultDocuments.length"></span>
+        </button>
+
+        <button @click="activeTab = 'mail'" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition"
+          :class="activeTab === 'mail' ? 'bg-zinc-850 text-white border border-zinc-700/60 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'">
+          <i class="fa-solid fa-inbox w-4 text-emerald-400"></i>
+          <span>Autonomous Mail</span>
+        </button>
+
+        <button @click="activeTab = 'debug'; loadDebugEvents()" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition"
+          :class="activeTab === 'debug' ? 'bg-zinc-850 text-white border border-zinc-700/60 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'">
+          <i class="fa-solid fa-bug w-4 text-rose-400"></i>
+          <span>Debug Inspector</span>
+          <span x-show="debugSummary?.error_count > 0" class="ml-auto px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500/20 text-rose-300 font-mono font-bold" x-text="debugSummary.error_count"></span>
+          <span x-show="!debugSummary?.error_count && debugSummary?.total_events > 0" class="ml-auto px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-800 text-zinc-400 font-mono" x-text="debugSummary.total_events"></span>
+        </button>
+      </div>
+
+      <!-- Quick Model Info in Sidebar -->
+      <div class="p-3 bg-zinc-900/80 border border-zinc-800 rounded-lg">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5 flex items-center justify-between">
+          <span>Inference Engine</span>
+          <button @click="showModelModal = true" class="text-teal-400 hover:underline text-[10px]">Change</button>
+        </div>
+        <div class="font-mono text-[11px] font-medium text-white truncate" x-text="formatModelName(status.model_name)"></div>
+        <div class="text-[10px] text-zinc-400 mt-0.5">12,288 Context (GTX 1650 Sweet Spot)</div>
+        <div class="mt-2 text-[10px] text-teal-400/90 flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span>Fine-tuned for Tool Calling</span>
+        </div>
+      </div>
+
+      <!-- Infrastructure Status in Sidebar -->
+      <div class="mt-2 p-3 bg-zinc-900/80 border border-zinc-800 rounded-lg">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5 flex items-center justify-between">
+          <span>Local Infra</span>
+          <button @click="restartInfra()" title="Auto-restart missing services" class="text-teal-400 hover:text-teal-300 text-[10px] flex items-center gap-1">
+            <i class="fa-solid fa-rotate-right text-[9px]" :class="isRestartingInfra ? 'animate-spin' : ''"></i>
+            <span>Check</span>
+          </button>
+        </div>
+        <div class="space-y-1.5 text-[10px]">
+          <div class="flex items-center justify-between">
+            <span class="text-zinc-400">Ollama (12K)</span>
+            <span class="flex items-center gap-1 font-mono" :class="infra?.services?.ollama?.online ? 'text-emerald-400' : 'text-red-400'">
+              <span class="w-1.5 h-1.5 rounded-full" :class="infra?.services?.ollama?.online ? 'bg-emerald-400' : 'bg-red-400'"></span>
+              <span x-text="infra?.services?.ollama?.online ? 'Ready' : 'Offline'"></span>
+            </span>
           </div>
-          <div class="flex items-center space-x-3 text-xs text-gray-500 font-mono">
-            <span>Specialists:</span>
-            <span class="text-amber-400"><i class="fa-solid fa-envelope mr-1"></i>mail_agent</span>
-            <span class="text-cyan-400"><i class="fa-solid fa-file-lines mr-1"></i>doc_agent</span>
-            <span class="text-purple-400"><i class="fa-solid fa-database mr-1"></i>rag_agent</span>
+          <div class="flex items-center justify-between">
+            <span class="text-zinc-400">Elasticsearch</span>
+            <span class="flex items-center gap-1 font-mono" :class="infra?.services?.elasticsearch?.online ? 'text-emerald-400' : 'text-red-400'">
+              <span class="w-1.5 h-1.5 rounded-full" :class="infra?.services?.elasticsearch?.online ? 'bg-emerald-400' : 'bg-red-400'"></span>
+              <span x-text="infra?.services?.elasticsearch?.online ? 'Ready' : 'Offline'"></span>
+            </span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-zinc-400">SearXNG</span>
+            <span class="flex items-center gap-1 font-mono" :class="infra?.services?.searxng?.online ? 'text-emerald-400' : 'text-red-400'">
+              <span class="w-1.5 h-1.5 rounded-full" :class="infra?.services?.searxng?.online ? 'bg-emerald-400' : 'bg-red-400'"></span>
+              <span x-text="infra?.services?.searxng?.online ? 'Ready' : 'Offline'"></span>
+            </span>
           </div>
         </div>
+      </div>
+    </aside>
 
-        <div class="relative">
-          <textarea
-            x-model="goalInput"
-            @keydown.enter.ctrl.prevent="executeCurrentGoal()"
-            placeholder="Instruct WorkOS (e.g. 'Search my inbox for recent invoices from Arvind, parse the line items into tables, cross-check with security standard, and prepare brief')..."
-            rows="2"
-            class="w-full bg-obsidian-base border border-obsidian-border rounded-lg px-4 py-3 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan font-sans transition-all resize-none shadow-inner"
-          ></textarea>
-        </div>
+    <!-- Center Stage: Multi-Tab Views -->
+    <main class="flex-1 flex bg-zinc-950 overflow-hidden relative">
 
-        <!-- Suggestion Chips & Action Triggers -->
-        <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <div class="flex flex-wrap items-center gap-1.5">
-            <span class="text-[11px] text-gray-500 mr-1">Quick Directives:</span>
-            <button @click="goalInput = 'Search emails for invoice from Arvind and parse attachment details'" class="text-xs px-2.5 py-1 rounded bg-obsidian-hover hover:bg-obsidian-subtle text-gray-300 transition border border-obsidian-border">📬 Email Invoice Search</button>
-            <button @click="goalInput = 'Summarize SOC2 security standards and provide grounded citations'" class="text-xs px-2.5 py-1 rounded bg-obsidian-hover hover:bg-obsidian-subtle text-gray-300 transition border border-obsidian-border">🔍 Knowledge Base RAG</button>
-            <button @click="goalInput = 'Parse uploaded document into structured markdown tables'" class="text-xs px-2.5 py-1 rounded bg-obsidian-hover hover:bg-obsidian-subtle text-gray-300 transition border border-obsidian-border">📄 Docling Table Extract</button>
-          </div>
-
-          <div class="flex items-center space-x-2">
-            <button @click="generatePlanOnly()" :disabled="executing || planning || !goalInput.trim()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-obsidian-hover hover:bg-obsidian-subtle text-gray-200 border border-obsidian-border disabled:opacity-50 transition flex items-center space-x-2 cursor-pointer shadow-sm">
-              <i class="fa-solid" :class="planning ? 'fa-circle-notch fa-spin text-brand-cyan' : 'fa-diagram-project text-brand-cyan'"></i>
-              <span x-text="planning ? 'Formulating Plan...' : 'Preview Plan'"></span>
-            </button>
-            <button @click="executeCurrentGoal()" :disabled="executing || planning || !goalInput.trim()" class="px-5 py-2 text-xs font-semibold rounded-lg bg-brand-cyan hover:bg-cyan-400 text-black shadow-lg shadow-cyan-500/20 disabled:opacity-50 transition flex items-center space-x-2 font-mono cursor-pointer">
-              <i class="fa-solid" :class="executing ? 'fa-circle-notch fa-spin' : 'fa-play'"></i>
-              <span x-text="executing ? 'Orchestrating...' : 'Execute Directive'"></span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Error Alert Banner -->
-        <template x-if="errorMessage">
-          <div class="mt-3 p-3 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-xs flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-              <i class="fa-solid fa-triangle-exclamation"></i>
-              <span x-text="errorMessage"></span>
+      <!-- =============================================================== -->
+      <!-- VIEW 1: ASSISTANT CHAT + DEDICATED DIALOGUE DRAWERS PANEL        -->
+      <!-- =============================================================== -->
+      <div x-show="activeTab === 'chat'" class="flex-1 flex h-full overflow-hidden">
+        
+        <!-- DIALOGUE DRAWERS PANEL (Beside the chat, fixed height, independent scroll) -->
+        <div class="w-64 border-r border-zinc-800/80 bg-zinc-950/70 flex flex-col shrink-0 h-full select-none">
+          <!-- Drawer Header -->
+          <div class="p-3 border-b border-zinc-800/80 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-1.5">
+              <i class="fa-solid fa-box-archive text-xs text-teal-400"></i>
+              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-300">Dialogue Drawers</span>
             </div>
-            <button @click="errorMessage = ''" class="text-rose-400 hover:text-rose-200"><i class="fa-solid fa-xmark"></i></button>
+            <button @click="startNewSession()" title="Start New Session" class="px-2 py-1 bg-teal-600/20 hover:bg-teal-600/30 text-teal-300 border border-teal-500/40 rounded text-[11px] font-medium transition flex items-center gap-1">
+              <i class="fa-solid fa-plus text-[9px]"></i> New
+            </button>
+          </div>
+
+          <!-- Sessions List (Independent vertical scroll) -->
+          <div class="flex-1 overflow-y-auto p-2 space-y-1">
+            <template x-for="s in sessions" :key="s.session_id">
+              <div class="group relative rounded-md transition"
+                :class="currentSessionId === s.session_id ? 'bg-zinc-850 border border-zinc-700/80' : 'hover:bg-zinc-900 border border-transparent'">
+                <button @click="switchSession(s.session_id)" class="w-full text-left px-2.5 py-2 flex flex-col">
+                  <div class="flex items-center justify-between w-full">
+                    <span class="truncate font-mono text-[11px] font-medium"
+                      :class="currentSessionId === s.session_id ? 'text-teal-300' : 'text-zinc-300'"
+                      x-text="s.session_id"></span>
+                    <span class="text-[10px] text-zinc-500 px-1 rounded bg-zinc-800 shrink-0 ml-1" x-text="s.turn_count + ' turns'"></span>
+                  </div>
+                  <span class="text-[10px] text-zinc-500 mt-0.5" x-text="s.last_updated ? formatTime(s.last_updated) : 'MemPalace Drawer'"></span>
+                </button>
+                <!-- Delete Turn Button -->
+                <button @click.stop="clearCurrentSession(s.session_id)" title="Clear Session" class="absolute right-2 top-2 p-1 text-zinc-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition">
+                  <i class="fa-solid fa-trash-can text-[10px]"></i>
+                </button>
+              </div>
+            </template>
+            <div x-show="sessions.length === 0" class="p-4 text-center text-xs text-zinc-500">
+              No previous drawers. Start a conversation!
+            </div>
+          </div>
+
+          <!-- Bottom Drawer Controls -->
+          <div class="p-3 border-t border-zinc-800/80 shrink-0 bg-zinc-950">
+            <button @click="clearCurrentSession(currentSessionId)" class="w-full py-1.5 px-2 bg-zinc-900 hover:bg-zinc-850 text-zinc-400 hover:text-rose-400 border border-zinc-800 rounded text-[11px] font-medium transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-broom text-[10px]"></i> Clear Active Dialogue
+            </button>
+          </div>
+        </div>
+
+        <!-- MAIN CHAT STREAM (Independent scroll, fills remaining width) -->
+        <div class="flex-1 flex flex-col h-full overflow-hidden bg-zinc-950">
+          
+          <!-- Chat Top Indicator Bar -->
+          <div class="h-10 px-5 border-b border-zinc-900 flex items-center justify-between text-xs text-zinc-400 shrink-0 bg-zinc-950/40">
+            <div class="flex items-center gap-2">
+              <span class="font-mono text-zinc-500">Drawer:</span>
+              <span class="font-mono text-teal-400 font-medium" x-text="currentSessionId"></span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-[11px] text-zinc-500" x-text="chatMessages.length + ' messages in context'"></span>
+              <span class="w-1 h-1 rounded-full bg-zinc-700"></span>
+              <span class="text-[11px] text-zinc-400 font-mono" x-text="formatModelName(status.model_name)"></span>
+            </div>
+          </div>
+
+          <!-- Messages Stream -->
+          <div class="flex-1 overflow-y-auto p-6 space-y-6" id="chatStream">
+            
+            <!-- Clean Empty State Hero (if no messages) -->
+            <div x-show="chatMessages.length === 0" class="max-w-2xl mx-auto text-center py-16">
+              <div class="w-12 h-12 rounded-xl bg-teal-600/10 border border-teal-500/30 text-teal-400 flex items-center justify-center mx-auto mb-4 text-xl">
+                <i class="fa-solid fa-compass"></i>
+              </div>
+              <h2 class="text-xl font-semibold text-white mb-2">WorkOS Executive Copilot</h2>
+              <p class="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed mb-6">
+                Autonomous executive AI operating system. Grounded in your 4-Network Memory Palace, 12K context window, and autonomous specialist agents.
+              </p>
+
+              <!-- Quick Action Prompt Chips -->
+              <div class="flex flex-wrap items-center justify-center gap-2 max-w-lg mx-auto">
+                <button @click="sendQuickPrompt('Organize all my recent invoice and billing emails into Invoices with subfolders by vendor')" class="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-teal-500/40 rounded-full text-xs text-zinc-300 transition flex items-center gap-1.5">
+                  📬 <span>Organize Invoices & Billing</span>
+                </button>
+                <button @click="sendQuickPrompt('Analyze recent documents in the vault and synthesize key takeaways and action items')" class="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 rounded-full text-xs text-zinc-300 transition">
+                  📄 <span>Document Intelligence</span>
+                </button>
+                <button @click="sendQuickPrompt('What are my active preferences, stored beliefs, and recent project context?')" class="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 rounded-full text-xs text-zinc-300 transition">
+                  🧠 <span>Active Memory & Beliefs</span>
+                </button>
+                <button @click="sendQuickPrompt('Conduct deep web research on latest advancements in autonomous multi-agent systems')" class="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 rounded-full text-xs text-zinc-300 transition">
+                  🌐 <span>Market & Tech Research</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Messages List -->
+            <template x-for="(msg, idx) in chatMessages" :key="idx">
+              <div class="max-w-3xl mx-auto flex gap-3" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
+                
+                <!-- Assistant Avatar -->
+                <div x-show="msg.role === 'assistant'" class="w-7 h-7 rounded bg-teal-600/20 border border-teal-500/40 text-teal-400 flex items-center justify-center text-xs shrink-0 mt-0.5">
+                  <i class="fa-solid fa-robot"></i>
+                </div>
+
+                <!-- Message Card -->
+                <div class="max-w-[85%] rounded-lg p-4 shadow-sm"
+                  :class="msg.role === 'user' ? 'bg-teal-950/40 border border-teal-600/30 text-zinc-100' : 'bg-zinc-900/90 border border-zinc-800 text-zinc-200'">
+                  
+                  <!-- Role & Timestamp Header -->
+                  <div class="flex items-center justify-between gap-4 mb-2 text-[10px] font-mono text-zinc-500 pb-1.5 border-b border-zinc-800/60">
+                    <span class="uppercase tracking-wider font-semibold" :class="msg.role === 'user' ? 'text-teal-400' : 'text-zinc-400'" x-text="msg.role === 'user' ? 'You' : 'WorkOS Assistant'"></span>
+                    <span x-text="formatTime(msg.timestamp)"></span>
+                  </div>
+
+                  <!-- Markdown Content -->
+                  <div class="prose-workos select-text" x-html="renderMarkdown(msg.content)"></div>
+
+                  <!-- Embedded Specialist Plan Execution Card (if plan returned) -->
+                  <template x-if="msg.plan && msg.plan.steps && msg.plan.steps.length">
+                    <div class="mt-4 pt-3 border-t border-zinc-800 space-y-2">
+                      <div class="text-[11px] font-mono font-semibold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+                        <span>Specialist Agents Dispatched</span>
+                        <span class="text-teal-400 font-normal" x-text="msg.plan.steps.length + ' steps'"></span>
+                      </div>
+                      <div class="space-y-1.5">
+                        <template x-for="st in msg.plan.steps" :key="st.step_id">
+                          <div class="p-2.5 rounded bg-zinc-950/80 border border-zinc-800 flex items-start justify-between gap-3 text-xs">
+                            <div>
+                              <div class="flex items-center gap-1.5 font-mono text-[11px] text-teal-400">
+                                <i class="fa-solid fa-gear text-[10px]"></i>
+                                <span x-text="st.assigned_agent"></span>
+                              </div>
+                              <div class="text-zinc-300 text-xs mt-0.5" x-text="st.description"></div>
+                            </div>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-mono shrink-0"
+                              :class="st.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-zinc-800 text-zinc-400'"
+                              x-text="st.status"></span>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- User Avatar -->
+                <div x-show="msg.role === 'user'" class="w-7 h-7 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 flex items-center justify-center text-xs shrink-0 mt-0.5">
+                  <i class="fa-solid fa-user"></i>
+                </div>
+              </div>
+            </template>
+
+            <!-- Thinking Indicator -->
+            <div x-show="isThinking" class="max-w-3xl mx-auto flex gap-3 items-center">
+              <div class="w-7 h-7 rounded bg-teal-600/20 border border-teal-500/40 text-teal-400 flex items-center justify-center text-xs shrink-0">
+                <i class="fa-solid fa-circle-notch animate-spin"></i>
+              </div>
+              <div class="px-4 py-2 rounded-md bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 flex items-center gap-2">
+                <span x-text="thinkingStatus"></span>
+                <span class="flex gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span>
+                  <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse delay-100"></span>
+                  <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse delay-200"></span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fixed Bottom Input Composer -->
+          <div class="p-4 border-t border-zinc-800/80 bg-zinc-950 shrink-0">
+            <div class="max-w-3xl mx-auto">
+              <form @submit.prevent="sendMessage()" class="relative rounded-lg border border-zinc-800 bg-zinc-900 focus-within:border-teal-500/60 focus-within:ring-1 focus-within:ring-teal-500/30 transition shadow-lg">
+                <textarea
+                  x-model="chatInput"
+                  @keydown.enter.prevent="if (!$event.shiftKey) sendMessage()"
+                  placeholder="Ask your WorkOS executive assistant or instruct specialist agents (e.g. 'Organize vendor receipts by company')..."
+                  rows="2"
+                  class="w-full bg-transparent p-3 pr-24 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none resize-none"
+                ></textarea>
+
+                <div class="absolute right-2.5 bottom-2.5 flex items-center gap-1.5">
+                  <button type="submit" :disabled="!chatInput.trim() || isThinking"
+                    class="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-30 disabled:hover:bg-teal-600 text-white rounded text-xs font-medium transition flex items-center gap-1.5">
+                    <span>Send</span>
+                    <i class="fa-solid fa-arrow-up text-[10px]"></i>
+                  </button>
+                </div>
+              </form>
+              <div class="flex items-center justify-between text-[10px] text-zinc-500 mt-1.5 px-1 font-mono">
+                <span>Press Enter to send, Shift+Enter for new line</span>
+                <span>Grounding: MemPalace FTS5 + Hindsight</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- =============================================================== -->
+      <!-- VIEW 2: OPERATIONS DAG                                          -->
+      <!-- =============================================================== -->
+      <section x-show="activeTab === 'dag'" class="flex-1 flex flex-col p-6 overflow-y-auto">
+        <div class="max-w-4xl mx-auto w-full space-y-6">
+          <div>
+            <h1 class="text-xl font-bold text-white">Operations DAG Tracker</h1>
+            <p class="text-xs text-zinc-400 mt-1">Real-time multi-agent execution pipeline with variable propagation ($step_1.saved_path).</p>
+          </div>
+
+          <!-- DAG Execution Input -->
+          <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800 space-y-3">
+            <label class="text-xs font-mono uppercase text-zinc-400">Dispatch Multi-Agent Goal</label>
+            <div class="flex gap-2">
+              <input type="text" x-model="dagGoalInput" placeholder="e.g. Ingest vendor contracts and compile financial summary table"
+                class="flex-1 bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-teal-500">
+              <button @click="executeGoalDirect(dagGoalInput)" :disabled="!dagGoalInput.trim() || isThinking"
+                class="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white text-xs font-medium rounded transition">
+                Execute Plan
+              </button>
+            </div>
+          </div>
+
+          <!-- Execution Steps -->
+          <div x-show="currentPlan && currentPlan.steps && currentPlan.steps.length" class="space-y-4">
+            <h3 class="text-xs font-mono uppercase tracking-wider text-zinc-400">Execution Plan Steps</h3>
+            <template x-for="step in (currentPlan ? currentPlan.steps : [])" :key="step.step_id">
+              <div class="p-4 rounded-lg bg-zinc-900/90 border border-zinc-800 space-y-2">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <span class="w-6 h-6 rounded bg-zinc-800 text-zinc-300 font-mono text-xs flex items-center justify-center font-bold" x-text="step.step_id"></span>
+                    <span class="text-xs font-mono text-teal-400 font-semibold uppercase" x-text="step.assigned_agent"></span>
+                  </div>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-mono"
+                    :class="step.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-zinc-800 text-zinc-400'"
+                    x-text="step.status"></span>
+                </div>
+                <div class="text-xs text-zinc-200" x-text="step.description"></div>
+                <template x-if="step.result && step.result.data">
+                  <div class="mt-2 p-2 bg-zinc-950 rounded font-mono text-[11px] text-zinc-400 overflow-x-auto max-h-40">
+                    <pre x-text="JSON.stringify(step.result.data, null, 2)"></pre>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </div>
+      </section>
+
+      <!-- =============================================================== -->
+      <!-- VIEW 3: COGNITIVE MEMORY PALACE                                 -->
+      <!-- =============================================================== -->
+      <section x-show="activeTab === 'memory'" class="flex-1 flex flex-col p-6 overflow-y-auto">
+        <div class="max-w-4xl mx-auto w-full space-y-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h1 class="text-xl font-bold text-white">4-Network Memory Palace</h1>
+              <p class="text-xs text-zinc-400 mt-1">Hindsight cognitive substrate indexed by spatial loci with automatic belief superseding.</p>
+            </div>
+            <button @click="searchMemory()" class="px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded text-xs text-zinc-300 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-arrows-rotate text-[10px]"></i> Refresh
+            </button>
+          </div>
+
+          <!-- Search & Filter Bar -->
+          <div class="flex gap-2">
+            <input type="text" x-model="memorySearchQuery" @input.debounce.300ms="searchMemory()" placeholder="BM25 full-text search across memories..."
+              class="flex-1 bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-teal-500">
+            <select x-model="memoryNetworkFilter" @change="searchMemory()" class="bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-zinc-300 focus:outline-none">
+              <option value="all">All Networks</option>
+              <option value="facts">Facts</option>
+              <option value="beliefs">Beliefs</option>
+              <option value="experiences">Experiences</option>
+              <option value="entities">Entities</option>
+            </select>
+          </div>
+
+          <!-- Memories List -->
+          <div class="space-y-3">
+            <template x-for="item in memoryItems" :key="item.id">
+              <div class="p-4 rounded-lg bg-zinc-900/90 border border-zinc-800 space-y-2">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold"
+                      :class="{
+                        'bg-blue-500/20 text-blue-400 border border-blue-500/30': item.network === 'facts',
+                        'bg-purple-500/20 text-purple-400 border border-purple-500/30': item.network === 'beliefs',
+                        'bg-amber-500/20 text-amber-400 border border-amber-500/30': item.network === 'experiences',
+                        'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30': item.network === 'entities'
+                      }"
+                      x-text="item.network"></span>
+                    <span class="text-xs font-mono text-zinc-400" x-text="item.wing + ' / ' + item.hall + ' / ' + item.key"></span>
+                  </div>
+                  <span class="text-[10px] text-zinc-500 font-mono" x-text="formatTime(item.created_at)"></span>
+                </div>
+                <div class="text-xs text-zinc-200 leading-relaxed" x-text="item.content"></div>
+              </div>
+            </template>
+            <div x-show="memoryItems.length === 0" class="p-8 text-center text-xs text-zinc-500">
+              No memories recorded in this network filter.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =============================================================== -->
+      <!-- VIEW 4: DOCUMENT VAULT                                          -->
+      <!-- =============================================================== -->
+      <section x-show="activeTab === 'vault'" class="flex-1 flex flex-col p-6 overflow-y-auto">
+        <div class="max-w-4xl mx-auto w-full space-y-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h1 class="text-xl font-bold text-white">Document Vault & Provenance</h1>
+              <p class="text-xs text-zinc-400 mt-1">Lossless source document repository with SHA-256 deduplication and Docling extraction.</p>
+            </div>
+            <button @click="loadVault()" class="px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded text-xs text-zinc-300 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-arrows-rotate text-[10px]"></i> Refresh
+            </button>
+          </div>
+
+          <!-- Documents List -->
+          <div class="space-y-3">
+            <template x-for="doc in vaultDocuments" :key="doc.doc_id">
+              <div class="p-4 rounded-lg bg-zinc-900/90 border border-zinc-800 flex items-center justify-between">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-file-pdf text-amber-400"></i>
+                    <span class="text-xs font-semibold text-white" x-text="doc.filename"></span>
+                  </div>
+                  <div class="text-[10px] text-zinc-400 font-mono mt-1" x-text="doc.sha256_hash ? doc.sha256_hash.substring(0, 16) + '...' : ''"></div>
+                </div>
+                <div class="flex items-center gap-3 text-xs">
+                  <span class="text-zinc-400" x-text="(doc.file_size_bytes / 1024).toFixed(1) + ' KB'"></span>
+                  <a :href="'/api/vault/' + doc.doc_id + '/file'" target="_blank" class="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-xs transition">
+                    View
+                  </a>
+                </div>
+              </div>
+            </template>
+            <div x-show="vaultDocuments.length === 0" class="p-12 text-center rounded-lg border border-dashed border-zinc-800 text-xs text-zinc-500">
+              <i class="fa-solid fa-folder-open text-2xl text-zinc-600 mb-2 block"></i>
+              Vault is completely clean. Uploaded documents will appear here.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =============================================================== -->
+      <!-- VIEW 5: AUTONOMOUS MAIL HUB                                     -->
+      <!-- =============================================================== -->
+      <section x-show="activeTab === 'mail'" class="flex-1 flex flex-col p-6 overflow-y-auto">
+        <div class="max-w-4xl mx-auto w-full space-y-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h1 class="text-xl font-bold text-white">Autonomous Mail Hub</h1>
+              <p class="text-xs text-zinc-400 mt-1">IMAP triage, policy-governed subfolder sorting, and supervised drafting.</p>
+            </div>
+            <button @click="sendQuickPrompt('Categorize and organize all recent emails into labeled folders based on sender organization')" class="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded text-xs font-medium transition flex items-center gap-1.5 shadow">
+              <i class="fa-solid fa-bolt text-[10px]"></i> Run Smart Triage (~50 emails)
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+              <div class="text-xs font-mono uppercase text-zinc-500 mb-1">IMAP Account</div>
+              <div class="text-sm font-medium text-white truncate">Connected over TLS</div>
+              <div class="text-[11px] text-emerald-400 mt-1"><i class="fa-solid fa-circle-check"></i> TLS Mailbox Active</div>
+            </div>
+            <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+              <div class="text-xs font-mono uppercase text-zinc-500 mb-1">Active Triage</div>
+              <div class="text-sm font-medium text-white">Autonomous Categorization</div>
+              <div class="text-[11px] text-zinc-400 mt-1">Clusters by organization, vendor, or project</div>
+            </div>
+            <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+              <div class="text-xs font-mono uppercase text-zinc-500 mb-1">Autonomy Mode</div>
+              <div class="text-sm font-medium text-white" x-text="status.autonomy_level"></div>
+              <div class="text-[11px] text-teal-400 mt-1">Supervised execution</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =============================================================== -->
+      <!-- VIEW 6: DEBUG INSPECTOR & TRACE OBSERVER                         -->
+      <!-- =============================================================== -->
+      <section x-show="activeTab === 'debug'" class="flex-1 flex flex-col p-6 overflow-y-auto bg-zinc-950">
+        <div class="max-w-6xl mx-auto w-full space-y-6">
+          
+          <!-- Header & Actions -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
+            <div>
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center">
+                  <i class="fa-solid fa-bug text-sm"></i>
+                </div>
+                <div>
+                  <h1 class="text-xl font-bold text-white flex items-center gap-2">
+                    <span>Debug Inspector</span>
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 font-mono font-normal">Real-Time</span>
+                  </h1>
+                  <p class="text-xs text-zinc-400 mt-0.5">Deep observability into LLM prompts, token generation, tool dispatch, JSON repairs, and errors.</p>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button @click="loadDebugEvents()" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-xs font-medium transition flex items-center gap-1.5 border border-zinc-700">
+                <i class="fa-solid fa-rotate-right text-[11px]" :class="isDebugRefreshing ? 'animate-spin' : ''"></i>
+                <span>Refresh</span>
+              </button>
+              <button @click="clearDebugEvents()" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-rose-300 rounded text-xs font-medium transition flex items-center gap-1.5 border border-zinc-700">
+                <i class="fa-solid fa-trash text-[11px]"></i>
+                <span>Clear Buffer</span>
+              </button>
+              <a href="/api/debug/download" target="_blank" class="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded text-xs font-medium transition flex items-center gap-1.5 shadow">
+                <i class="fa-solid fa-download text-[11px]"></i>
+                <span>Download Log</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Aggregate Status Metrics -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-zinc-900/90 border border-zinc-800 rounded-lg p-3">
+              <div class="text-[11px] font-mono uppercase text-zinc-500">Buffered Events</div>
+              <div class="text-xl font-bold font-mono text-white mt-0.5" x-text="debugSummary?.total_events || 0"></div>
+            </div>
+            <div class="bg-zinc-900/90 border border-zinc-800 rounded-lg p-3">
+              <div class="text-[11px] font-mono uppercase text-zinc-500">Errors Detected</div>
+              <div class="text-xl font-bold font-mono mt-0.5" :class="debugSummary?.error_count > 0 ? 'text-rose-400' : 'text-emerald-400'" x-text="debugSummary?.error_count || 0"></div>
+            </div>
+            <div class="bg-zinc-900/90 border border-zinc-800 rounded-lg p-3">
+              <div class="text-[11px] font-mono uppercase text-zinc-500">LLM Inferences</div>
+              <div class="text-xl font-bold font-mono text-purple-400 mt-0.5" x-text="(debugSummary?.type_counts?.LLM_PROMPT || 0)"></div>
+            </div>
+            <div class="bg-zinc-900/90 border border-zinc-800 rounded-lg p-3">
+              <div class="text-[11px] font-mono uppercase text-zinc-500">JSON Parses</div>
+              <div class="text-xl font-bold font-mono text-cyan-400 mt-0.5" x-text="(debugSummary?.type_counts?.JSON_PARSE || 0)"></div>
+            </div>
+          </div>
+
+          <!-- Filter & Search Toolbar -->
+          <div class="bg-zinc-900/60 border border-zinc-800 rounded-lg p-3 flex flex-col md:flex-row items-center gap-3 justify-between">
+            <div class="flex items-center gap-2 flex-wrap w-full md:w-auto">
+              <span class="text-xs text-zinc-400 font-medium">Filter:</span>
+              <button @click="debugFilterType = 'all'; loadDebugEvents()" class="px-2.5 py-1 rounded text-xs font-mono transition"
+                :class="debugFilterType === 'all' ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'">All</button>
+              <button @click="debugFilterType = 'LLM_PROMPT'; loadDebugEvents()" class="px-2.5 py-1 rounded text-xs font-mono transition"
+                :class="debugFilterType === 'LLM_PROMPT' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'">Prompts</button>
+              <button @click="debugFilterType = 'LLM_RESPONSE'; loadDebugEvents()" class="px-2.5 py-1 rounded text-xs font-mono transition"
+                :class="debugFilterType === 'LLM_RESPONSE' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'">Outputs</button>
+              <button @click="debugFilterType = 'JSON_PARSE'; loadDebugEvents()" class="px-2.5 py-1 rounded text-xs font-mono transition"
+                :class="debugFilterType === 'JSON_PARSE' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'">JSON</button>
+              <button @click="debugFilterType = 'TOOL_CALL'; loadDebugEvents()" class="px-2.5 py-1 rounded text-xs font-mono transition"
+                :class="debugFilterType === 'TOOL_CALL' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'">Tools</button>
+              <button @click="debugFilterLevel = debugFilterLevel === 'ERROR' ? 'all' : 'ERROR'; loadDebugEvents()" class="px-2.5 py-1 rounded text-xs font-mono transition"
+                :class="debugFilterLevel === 'ERROR' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'">Errors Only</button>
+            </div>
+            
+            <div class="relative w-full md:w-64">
+              <input type="text" x-model="debugSearchQuery" @input.debounce.300ms="loadDebugEvents()" placeholder="Search traces..."
+                class="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-1.5 pl-8 text-xs text-white focus:outline-none focus:border-teal-500 font-mono">
+              <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-zinc-500 text-[11px]"></i>
+            </div>
+          </div>
+
+          <!-- Trace Event Stream -->
+          <div class="space-y-2">
+            <template x-if="debugEvents.length === 0">
+              <div class="p-8 text-center bg-zinc-900/40 border border-zinc-800 rounded-lg text-zinc-500 text-xs font-mono">
+                No debug events matching filters. System operations will appear here in real-time.
+              </div>
+            </template>
+
+            <template x-for="ev in debugEvents" :key="ev.id">
+              <div class="bg-zinc-900 border rounded-lg overflow-hidden transition"
+                :class="ev.level === 'ERROR' ? 'border-rose-900/60 bg-rose-950/10' : ev.level === 'WARNING' ? 'border-amber-900/50 bg-amber-950/10' : 'border-zinc-800/80 hover:border-zinc-700'">
+                
+                <!-- Event Header Bar -->
+                <div @click="toggleEventExpand(ev.id)" class="p-3 flex items-center justify-between cursor-pointer select-none">
+                  <div class="flex items-center gap-2.5 flex-wrap">
+                    <!-- Level Badge -->
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase"
+                      :class="ev.level === 'ERROR' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : ev.level === 'WARNING' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-zinc-800 text-zinc-400'"
+                      x-text="ev.level"></span>
+
+                    <!-- Event Type Badge -->
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono"
+                      :class="{
+                        'bg-purple-950/60 text-purple-300 border border-purple-800/50': ev.event_type === 'LLM_PROMPT',
+                        'bg-blue-950/60 text-blue-300 border border-blue-800/50': ev.event_type === 'LLM_RESPONSE',
+                        'bg-cyan-950/60 text-cyan-300 border border-cyan-800/50': ev.event_type === 'JSON_PARSE',
+                        'bg-teal-950/60 text-teal-300 border border-teal-800/50': ev.event_type === 'PLAN_FORMULATED',
+                        'bg-emerald-950/60 text-emerald-300 border border-emerald-800/50': ev.event_type === 'TOOL_CALL' || ev.event_type === 'TOOL_RESULT',
+                        'bg-rose-950/60 text-rose-300 border border-rose-800/50': ev.event_type === 'SYSTEM_ERROR',
+                        'bg-zinc-800 text-zinc-300': !['LLM_PROMPT','LLM_RESPONSE','JSON_PARSE','PLAN_FORMULATED','TOOL_CALL','TOOL_RESULT','SYSTEM_ERROR'].includes(ev.event_type)
+                      }"
+                      x-text="ev.event_type"></span>
+
+                    <!-- Component -->
+                    <span class="text-xs font-mono font-semibold text-zinc-300" x-text="ev.component"></span>
+
+                    <!-- Message -->
+                    <span class="text-xs text-zinc-200" x-text="ev.message"></span>
+                  </div>
+
+                  <div class="flex items-center gap-3 text-[11px] font-mono text-zinc-500 shrink-0">
+                    <span x-show="ev.duration_ms !== null" class="text-teal-400" x-text="ev.duration_ms + 'ms'"></span>
+                    <span x-text="ev.timestamp.split('T')[1]?.substring(0, 8)"></span>
+                    <i class="fa-solid fa-chevron-down transition text-xs" :class="debugExpandedEventId === ev.id ? 'rotate-180 text-teal-400' : 'text-zinc-600'"></i>
+                  </div>
+                </div>
+
+                <!-- Expanded Event Details & Payloads -->
+                <div x-show="debugExpandedEventId === ev.id" x-collapse class="px-4 pb-4 pt-1 border-t border-zinc-800/60 bg-zinc-950/80 space-y-3">
+                  <div class="flex items-center justify-between text-[11px] text-zinc-500 font-mono">
+                    <span>Event ID: <span class="text-zinc-300" x-text="ev.id"></span></span>
+                    <span x-show="ev.session_id">Session: <span class="text-zinc-300" x-text="ev.session_id"></span></span>
+                    <button @click.stop="copyToClipboard(JSON.stringify(ev, null, 2))" class="text-teal-400 hover:text-teal-300 flex items-center gap-1">
+                      <i class="fa-solid fa-copy text-[10px]"></i> Copy JSON
+                    </button>
+                  </div>
+
+                  <!-- Error message if present -->
+                  <div x-show="ev.error" class="p-3 bg-rose-950/30 border border-rose-800/50 rounded text-xs text-rose-300 font-mono overflow-x-auto whitespace-pre-wrap" x-text="ev.error"></div>
+
+                  <!-- Payload JSON -->
+                  <div x-show="Object.keys(ev.payload || {}).length > 0">
+                    <div class="text-[10px] font-mono uppercase text-zinc-500 mb-1">Payload Content:</div>
+                    <pre class="bg-zinc-900 border border-zinc-800 rounded p-3 text-[11px] font-mono text-zinc-300 overflow-x-auto max-h-96 leading-relaxed whitespace-pre-wrap" x-text="JSON.stringify(ev.payload, null, 2)"></pre>
+                  </div>
+                </div>
+
+              </div>
+            </template>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- MODEL SWITCHER MODAL                                              -->
+  <!-- ================================================================= -->
+  <div x-show="showModelModal" @keydown.escape.window="showModelModal = false" x-transition.opacity
+    class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div @click.away="showModelModal = false" class="bg-zinc-900 border border-zinc-700/80 rounded-xl max-w-xl w-full p-6 shadow-2xl space-y-5">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-teal-500/20 border border-teal-500/40 text-teal-400 flex items-center justify-center">
+            <i class="fa-solid fa-microchip"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-semibold text-white">Select Inference Model</h3>
+            <p class="text-xs text-zinc-400">All models run 100% locally on Ollama using your GTX 1650 GPU.</p>
+          </div>
+        </div>
+        <button @click="showModelModal = false" class="text-zinc-500 hover:text-zinc-200">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Models List -->
+      <div class="space-y-3">
+        <template x-for="m in detailedModels" :key="m.id">
+          <div @click="switchModel(m.id)"
+            class="p-4 rounded-lg border cursor-pointer transition-all flex items-start justify-between gap-4"
+            :class="status.model_name === m.id || (m.recommended && status.model_name.includes('refinedtoolcall'))
+              ? 'bg-teal-950/30 border-teal-500/80 ring-1 ring-teal-500/40'
+              : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850/40'">
+            
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-semibold text-white" x-text="m.name"></span>
+                <span x-show="m.recommended" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/40">
+                  ★ Recommended
+                </span>
+                <span x-show="status.model_name === m.id || (m.recommended && status.model_name.includes('refinedtoolcall'))"
+                  class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  Active
+                </span>
+              </div>
+              <div class="text-xs text-zinc-300 font-mono" x-text="m.tag"></div>
+              <div class="text-[11px] text-zinc-400 flex items-center gap-3 pt-1">
+                <span><i class="fa-solid fa-database text-[10px] mr-1 text-zinc-500"></i><span x-text="m.context"></span></span>
+                <span><i class="fa-solid fa-sliders text-[10px] mr-1 text-zinc-500"></i>Temp 0.6 • Top-P 0.95</span>
+              </div>
+            </div>
+
+            <div class="shrink-0 mt-1">
+              <div class="w-5 h-5 rounded-full border flex items-center justify-center transition"
+                :class="status.model_name === m.id || (m.recommended && status.model_name.includes('refinedtoolcall'))
+                  ? 'border-teal-400 bg-teal-500 text-zinc-950 font-bold text-xs'
+                  : 'border-zinc-700 bg-zinc-900'">
+                <i class="fa-solid fa-check text-[10px]" x-show="status.model_name === m.id || (m.recommended && status.model_name.includes('refinedtoolcall'))"></i>
+              </div>
+            </div>
           </div>
         </template>
       </div>
 
-      <!-- Split Canvas: Left (60% Execution & Synthesis) | Right (40% Provenance & Evidence) -->
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        
-        <!-- LEFT CANVAS (7 Columns): DAG & Synthesis -->
-        <div class="lg:col-span-7 space-y-5">
-          
-          <!-- Dynamic Multi-Agent DAG Visualizer -->
-          <template x-if="activePlan && activePlan.steps && activePlan.steps.length > 0">
-            <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-3.5">
-              <div class="flex items-center justify-between border-b border-obsidian-border pb-3">
-                <div class="flex items-center space-x-2">
-                  <span class="w-2.5 h-2.5 rounded-full bg-brand-cyan shadow-sm shadow-cyan-400 animate-pulse"></span>
-                  <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-300">Live Multi-Agent DAG Execution</h3>
-                </div>
-                <span class="text-xs font-mono text-gray-400" x-text="`${activePlan.steps.length} Steps Orchestrated`"></span>
-              </div>
-
-              <!-- Step Cards Pipeline -->
-              <div class="space-y-2.5">
-                <template x-for="(step, index) in activePlan.steps" :key="step.step_id">
-                  <div class="border rounded-lg p-3 transition-all relative overflow-hidden"
-                    :class="{
-                      'border-emerald-700/60 bg-emerald-950/20': step.status === 'completed',
-                      'border-rose-700/60 bg-rose-950/20': step.status === 'failed',
-                      'border-brand-cyan/80 bg-cyan-950/30 ring-1 ring-brand-cyan/40 glow-cyan': step.status === 'in_progress',
-                      'border-obsidian-border bg-obsidian-base/60': step.status === 'pending'
-                    }">
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center space-x-2.5">
-                        <span class="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-obsidian-card border border-obsidian-border"
-                          :class="step.status === 'completed' ? 'text-brand-emerald' : 'text-brand-cyan'"
-                          x-text="`0${step.step_id}`"></span>
-                        <span class="text-xs font-medium text-gray-100" x-text="step.description"></span>
-                      </div>
-                      
-                      <div class="flex items-center space-x-2">
-                        <!-- Agent Badge -->
-                        <span class="text-[10px] font-mono px-2 py-0.5 rounded border"
-                          :class="{
-                            'bg-amber-950/60 text-amber-300 border-amber-800/60': step.assigned_agent === 'mail_agent',
-                            'bg-cyan-950/60 text-cyan-300 border-cyan-800/60': step.assigned_agent === 'doc_agent',
-                            'bg-purple-950/60 text-purple-300 border-purple-800/60': step.assigned_agent === 'rag_agent',
-                            'bg-blue-950/60 text-blue-300 border-blue-800/60': step.assigned_agent === 'web_agent'
-                          }" x-text="step.assigned_agent"></span>
-
-                        <!-- Status Icon -->
-                        <span class="text-xs font-mono">
-                          <i x-show="step.status === 'completed'" class="fa-solid fa-circle-check text-brand-emerald"></i>
-                          <i x-show="step.status === 'in_progress'" class="fa-solid fa-circle-notch fa-spin text-brand-cyan"></i>
-                          <i x-show="step.status === 'failed'" class="fa-solid fa-circle-xmark text-brand-rose"></i>
-                          <i x-show="step.status === 'pending'" class="fa-regular fa-circle text-gray-600"></i>
-                        </span>
-                      </div>
-                    </div>
-
-                    <!-- Variable Interpolation Payload -->
-                    <template x-if="step.input_data && Object.keys(step.input_data).length > 0">
-                      <div class="mt-2 pt-2 border-t border-obsidian-border/60 flex items-center justify-between text-[11px] font-mono text-gray-400">
-                        <span class="text-gray-500 truncate max-w-[280px]" x-text="`Input: ${JSON.stringify(step.input_data)}`"></span>
-                        <span class="text-[10px] uppercase font-semibold text-gray-400" x-text="step.status"></span>
-                      </div>
-                    </template>
-                  </div>
-                </template>
-              </div>
-            </div>
-          </template>
-
-          <!-- Grounded Executive Synthesis Brief -->
-          <template x-if="executionResult">
-            <div class="bg-obsidian-card border border-cyan-800/40 rounded-xl p-6 shadow-2xl space-y-4 glow-cyan">
-              <div class="flex items-center justify-between border-b border-obsidian-border pb-3">
-                <div class="flex items-center space-x-2">
-                  <i class="fa-solid fa-square-poll-vertical text-brand-cyan"></i>
-                  <h3 class="text-sm font-semibold text-gray-100">Grounded Executive Synthesis</h3>
-                </div>
-                <div class="flex items-center space-x-2">
-                  <button @click="copySynthesis()" class="text-xs text-gray-400 hover:text-brand-cyan transition px-2 py-1 rounded bg-obsidian-base border border-obsidian-border flex items-center space-x-1">
-                    <i class="fa-regular fa-copy"></i>
-                    <span>Copy Brief</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Rendered Markdown Body with Citation Interceptor -->
-              <div class="prose-dark text-sm leading-relaxed" x-html="renderEnhancedMarkdown(executionResult.final_output)"></div>
-            </div>
-          </template>
-
-          <template x-if="!activePlan && !executionResult">
-            <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-12 text-center text-gray-500 space-y-2">
-              <i class="fa-solid fa-compass-drafting text-2xl text-gray-600"></i>
-              <p class="text-xs">No active execution running. Enter a directive above to orchestrate subagents.</p>
-            </div>
-          </template>
-        </div>
-
-        <!-- RIGHT CANVAS (5 Columns): Provenance & Citation Inspector -->
-        <div class="lg:col-span-5 space-y-5">
-          
-          <!-- Selected Evidence & Citation Card -->
-          <div id="citation-inspector-card" class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-4 scroll-mt-6">
-            <div class="flex items-center justify-between border-b border-obsidian-border pb-3">
-              <div class="flex items-center space-x-2">
-                <i class="fa-solid fa-quote-right text-brand-cyan text-xs"></i>
-                <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-300">Citation Provenance Inspector</h3>
-              </div>
-              <span class="text-[10px] font-mono text-gray-500">Side-by-Side Audit</span>
-            </div>
-
-            <!-- Active Selected Citation Details -->
-            <template x-if="selectedCitation">
-              <div class="space-y-3">
-                <div class="p-3.5 rounded-lg bg-obsidian-base border border-obsidian-border space-y-2">
-                  <div class="flex items-center justify-between text-xs font-mono">
-                    <span class="text-brand-cyan font-bold" x-text="selectedCitation.citation_id"></span>
-                    <span class="text-gray-300 font-semibold truncate max-w-[200px]" x-text="selectedCitation.title || selectedCitation.filename || 'Source Link'"></span>
-                  </div>
-                  
-                  <div class="text-xs text-gray-400 font-mono text-[11px] space-y-1">
-                    <template x-if="selectedCitation.doc_id">
-                      <div><span class="text-gray-500">Doc ID:</span> <span class="text-gray-300" x-text="selectedCitation.doc_id"></span></div>
-                    </template>
-                    <template x-if="selectedCitation.url">
-                      <div><span class="text-gray-500">URL:</span> <span class="text-brand-cyan truncate block" x-text="selectedCitation.url"></span></div>
-                    </template>
-                    <div><span class="text-gray-500">Score:</span> <span class="text-brand-emerald" x-text="selectedCitation.score || '1.0'"></span></div>
-                  </div>
-
-                  <!-- Extracted Snippet Quote -->
-                  <div class="p-3 rounded bg-obsidian-card border-l-2 border-brand-cyan text-xs text-gray-200 leading-relaxed">
-                    <div class="prose-dark text-xs" x-html="renderMarkdown(selectedCitation.snippet)"></div>
-                  </div>
-                </div>
-
-                <!-- 1-Click Open File or Web Link -->
-                <template x-if="selectedCitation.url">
-                  <a :href="selectedCitation.url" target="_blank" class="w-full py-2 px-3 rounded-lg bg-brand-cyan/10 hover:bg-brand-cyan/20 border border-brand-cyan/40 text-brand-cyan text-xs font-semibold text-center flex items-center justify-center space-x-2 transition">
-                    <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
-                    <span>Open Live Web Page in New Tab</span>
-                  </a>
-                </template>
-                <template x-if="selectedCitation.doc_id && !selectedCitation.url">
-                  <a :href="`/api/vault/${selectedCitation.doc_id}/file`" target="_blank" class="w-full py-2 px-3 rounded-lg bg-brand-cyan/10 hover:bg-brand-cyan/20 border border-brand-cyan/40 text-brand-cyan text-xs font-semibold text-center flex items-center justify-center space-x-2 transition">
-                    <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
-                    <span>Open Lossless Source in Vault</span>
-                  </a>
-                </template>
-              </div>
-            </template>
-
-            <!-- All Citations List -->
-            <template x-if="executionResult && executionResult.citations && executionResult.citations.length > 0">
-              <div class="space-y-2 pt-2 border-t border-obsidian-border">
-                <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400">All Grounded Citations:</span>
-                <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-                  <template x-for="cit in executionResult.citations" :key="cit.citation_id">
-                    <div @click="selectCitation(cit)" class="p-2.5 rounded-lg border cursor-pointer transition flex items-center justify-between text-xs font-mono"
-                      :class="selectedCitation && selectedCitation.citation_id === cit.citation_id ? 'bg-cyan-950/40 border-brand-cyan text-brand-cyan' : 'bg-obsidian-base border-obsidian-border text-gray-300 hover:border-gray-600'">
-                      <span class="font-bold" x-text="cit.citation_id"></span>
-                      <span class="truncate max-w-[180px] text-gray-400" x-text="cit.filename"></span>
-                      <i class="fa-solid fa-chevron-right text-[10px]"></i>
-                    </div>
-                  </template>
-                </div>
-              </div>
-            </template>
-
-            <template x-if="!selectedCitation && (!executionResult || !executionResult.citations || executionResult.citations.length === 0)">
-              <div class="py-8 text-center text-gray-500 space-y-1.5">
-                <i class="fa-solid fa-fingerprint text-xl text-gray-600"></i>
-                <p class="text-xs">Click on any citation tag <span class="text-brand-cyan font-mono">[1]</span> in the synthesis to inspect provenance.</p>
-              </div>
-            </template>
-          </div>
-
-          <!-- Active Cognitive Beliefs & Rules -->
-          <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-3">
-            <div class="flex items-center justify-between border-b border-obsidian-border pb-2.5">
-              <div class="flex items-center space-x-2">
-                <i class="fa-solid fa-sliders text-brand-violet text-xs"></i>
-                <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-300">Active Behavioral Beliefs</h3>
-              </div>
-              <span class="text-[10px] font-mono text-brand-violet">Loci Engine</span>
-            </div>
-
-            <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
-              <template x-for="b in memoryData.active_beliefs" :key="b.id">
-                <div class="p-2 rounded bg-obsidian-base border border-obsidian-border text-xs">
-                  <div class="flex items-center justify-between text-[11px] font-mono mb-1">
-                    <span class="text-yellow-400" x-text="`${b.wing}/${b.hall}`"></span>
-                    <span class="text-cyan-400" x-text="b.key"></span>
-                  </div>
-                  <p class="text-gray-300 text-[11px]" x-text="b.content"></p>
-                </div>
-              </template>
-            </div>
-          </div>
-
-        </div>
-
+      <!-- Modal Footer -->
+      <div class="pt-3 border-t border-zinc-800 flex items-center justify-between text-xs text-zinc-400">
+        <span>Context window allocated: <strong class="text-teal-400" x-text="((status.num_ctx || 12288)).toLocaleString() + ' tokens (12K)'">12,288 tokens (12K)</strong></span>
+        <button @click="showModelModal = false" class="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded text-xs font-medium transition">
+          Done
+        </button>
       </div>
 
-    </div>
-
-    <!-- ==================== TAB 2: DOCUMENT VAULT ==================== -->
-    <div x-show="activeTab === 'vault'" class="space-y-6" x-transition>
-      <!-- Upload Dropzone -->
-      <div class="bg-obsidian-card border-2 border-dashed border-obsidian-border hover:border-brand-cyan rounded-xl p-8 text-center transition cursor-pointer"
-        @dragover.prevent="" @drop.prevent="handleFileDrop($event)">
-        <input type="file" id="fileUploadInput" class="hidden" @change="uploadSelectedFile($event)" accept=".pdf,.docx,.txt,.md,.json">
-        <label for="fileUploadInput" class="cursor-pointer space-y-3 block">
-          <div class="w-12 h-12 rounded-full bg-cyan-950/60 border border-brand-cyan/40 flex items-center justify-center mx-auto text-brand-cyan">
-            <i class="fa-solid fa-cloud-arrow-up text-lg"></i>
-          </div>
-          <div>
-            <h4 class="text-sm font-semibold text-gray-100">Upload Original Source Document to Vault</h4>
-            <p class="text-xs text-gray-400 mt-1">PDF, DOCX, TXT, MD — Automatically preserved with SHA-256 and indexed into RAG</p>
-          </div>
-        </label>
-      </div>
-
-      <!-- Vault Catalog Grid -->
-      <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-4">
-        <div class="flex items-center justify-between border-b border-obsidian-border pb-3">
-          <h3 class="text-sm font-semibold text-gray-200">Preserved Original Documents in Vault</h3>
-          <button @click="fetchVaultDocuments()" class="text-xs text-gray-400 hover:text-brand-cyan"><i class="fa-solid fa-rotate-right mr-1"></i> Refresh</button>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <template x-for="doc in vaultDocuments" :key="doc.doc_id">
-            <div class="border border-obsidian-border rounded-lg p-4 bg-obsidian-base hover:border-obsidian-subtle transition flex flex-col justify-between space-y-3">
-              <div>
-                <div class="flex items-start justify-between gap-2">
-                  <div class="flex items-center space-x-2 truncate">
-                    <i class="fa-solid fa-file-pdf text-rose-400 text-sm"></i>
-                    <h4 class="text-xs font-semibold text-gray-100 truncate" x-text="doc.filename"></h4>
-                  </div>
-                  <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-obsidian-card text-gray-400" x-text="formatBytes(doc.file_size_bytes)"></span>
-                </div>
-                <p class="text-[11px] font-mono text-gray-500 mt-1 truncate" x-text="`ID: ${doc.doc_id}`"></p>
-                <div class="flex items-center space-x-2 mt-2 text-[11px] text-gray-400">
-                  <span x-text="`${doc.table_count || 0} Tables`"></span>
-                  <span>•</span>
-                  <span x-text="`${doc.chunk_count || 0} Chunks`"></span>
-                </div>
-              </div>
-
-              <div class="flex items-center space-x-2 pt-2 border-t border-obsidian-border">
-                <a :href="`/api/vault/${doc.doc_id}/file`" target="_blank" class="flex-1 text-center py-1 rounded bg-obsidian-card hover:bg-obsidian-hover text-gray-200 text-xs font-medium transition">
-                  <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> View Original
-                </a>
-                <button @click="inspectParsedDoc(doc.doc_id)" class="flex-1 text-center py-1 rounded bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800 text-xs font-medium transition">
-                  <i class="fa-solid fa-code mr-1"></i> Parsed Markdown
-                </button>
-              </div>
-            </div>
-          </template>
-        </div>
-      </div>
-    </div>
-
-    <!-- ==================== TAB 3: COGNITIVE PALACE ==================== -->
-    <div x-show="activeTab === 'memory'" class="space-y-6" x-transition>
-      <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-obsidian-border pb-3">
-          <div>
-            <h3 class="text-sm font-semibold text-gray-200">Cognitive Memory Palace (4-Network Engine)</h3>
-            <p class="text-xs text-gray-400 mt-0.5">Facts, Experiences, Entities, and Evolving Beliefs</p>
-          </div>
-          <div class="relative w-64">
-            <input type="text" x-model="memorySearchQuery" @input.debounce.300ms="searchMemory()" placeholder="Search memory (FTS5 BM25)..."
-              class="w-full bg-obsidian-base border border-obsidian-border rounded-lg px-3 py-1.5 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-brand-cyan">
-          </div>
-        </div>
-
-        <!-- Spatial Loci Context Banner -->
-        <div class="p-3.5 rounded-lg bg-obsidian-base border border-obsidian-border font-mono text-xs text-brand-cyan leading-relaxed overflow-x-auto">
-          <div class="text-gray-500 text-[10px] uppercase font-bold mb-1">Spatial Loci Index (< 150 tokens)</div>
-          <div x-text="memoryData.spatial_summary || 'No memory loci loaded.'"></div>
-        </div>
-
-        <!-- Active Beliefs Table -->
-        <div class="space-y-2">
-          <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-400">Active User Beliefs & Preferences</h4>
-          <div class="overflow-x-auto">
-            <table class="w-full text-xs text-left text-gray-300 border border-obsidian-border rounded-lg">
-              <thead class="bg-obsidian-base text-gray-400 uppercase text-[10px] font-mono border-b border-obsidian-border">
-                <tr>
-                  <th class="px-4 py-2">Locus</th>
-                  <th class="px-4 py-2">Rule Key</th>
-                  <th class="px-4 py-2">Behavioral Rule / Fact</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-obsidian-border">
-                <template x-for="b in (memorySearchResults.length ? memorySearchResults : memoryData.active_beliefs)" :key="b.id">
-                  <tr class="hover:bg-obsidian-base/60">
-                    <td class="px-4 py-2.5 font-mono text-yellow-400" x-text="`${b.wing}/${b.hall}`"></td>
-                    <td class="px-4 py-2.5 font-mono text-cyan-400" x-text="b.key"></td>
-                    <td class="px-4 py-2.5 text-gray-200" x-text="b.content"></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ==================== TAB 4: MAIL HUB ==================== -->
-    <div x-show="activeTab === 'mail'" class="space-y-6" x-transition>
-      <div class="bg-obsidian-card border border-obsidian-border rounded-xl p-5 shadow-xl space-y-4">
-        <div class="flex items-center justify-between border-b border-obsidian-border pb-3">
-          <div>
-            <h3 class="text-sm font-semibold text-gray-200">Autonomous Email Dispatch & Inbox Triage</h3>
-            <p class="text-xs text-gray-400 mt-0.5">Policy Status: <span class="font-mono text-brand-cyan font-bold" x-text="status.autonomy_level"></span></p>
-          </div>
-          <button @click="fetchMailInbox()" class="text-xs text-gray-400 hover:text-brand-cyan"><i class="fa-solid fa-rotate-right mr-1"></i> Fetch Inbox</button>
-        </div>
-
-        <div class="space-y-3">
-          <template x-for="mail in inboxEmails" :key="mail.uid || mail.subject">
-            <div class="p-3.5 rounded-lg bg-obsidian-base border border-obsidian-border hover:border-obsidian-subtle transition space-y-1">
-              <div class="flex items-center justify-between text-xs">
-                <span class="font-semibold text-gray-200" x-text="mail.sender"></span>
-                <span class="text-gray-500 font-mono text-[11px]" x-text="mail.date || 'Recent'"></span>
-              </div>
-              <h4 class="text-xs font-medium text-cyan-300" x-text="mail.subject"></h4>
-              <p class="text-xs text-gray-400 line-clamp-2" x-text="mail.snippet || mail.body"></p>
-            </div>
-          </template>
-          <template x-if="inboxEmails.length === 0">
-            <p class="text-xs text-gray-500 text-center py-6">No emails in inbox or IMAP credentials unconfigured.</p>
-          </template>
-        </div>
-      </div>
-    </div>
-
-  </main>
-
-  <!-- Modal for Document Parsed Preview -->
-  <div x-show="previewModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" style="display: none;" x-transition>
-    <div class="bg-obsidian-card border border-obsidian-border rounded-xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden" @click.away="previewModalOpen = false">
-      <div class="px-6 py-4 border-b border-obsidian-border flex items-center justify-between">
-        <h3 class="text-sm font-semibold text-gray-100" x-text="previewModalTitle"></h3>
-        <button @click="previewModalOpen = false" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="p-6 overflow-y-auto prose-dark text-xs leading-relaxed" x-html="renderMarkdown(previewModalContent)"></div>
     </div>
   </div>
 
+  <!-- Toast Notification -->
+  <div x-show="toastMessage" x-transition class="fixed bottom-6 right-6 z-50 bg-zinc-900 border border-teal-500/60 shadow-2xl rounded-lg px-4 py-3 flex items-center gap-2.5 text-xs text-white">
+    <i class="fa-solid fa-circle-check text-teal-400"></i>
+    <span x-text="toastMessage"></span>
+  </div>
+
+  <!-- Alpine App Logic -->
   <script>
-    function workosCockpit() {
+    function workosApp() {
       return {
-        activeTab: 'cockpit',
-        goalInput: '',
-        planning: false,
-        executing: false,
-        errorMessage: '',
-        activePlan: null,
-        executionResult: null,
-        selectedCitation: null,
+        activeTab: 'chat',
+        showModelModal: false,
+        toastMessage: '',
+        isThinking: false,
+        thinkingStatus: 'Analyzing with Cognitive Memory',
+        chatInput: '',
+        chatMessages: [],
+        currentSessionId: 'session_' + Math.random().toString(36).substring(2, 8),
+        sessions: [],
         status: {
-          version: '1.0.0',
-          model_name: 'hf.co/unsloth/SmolLM3-3B-GGUF:UD-Q6_K_XL',
           ollama_online: true,
-          available_models: [],
+          model_name: 'refinedneuro/refinedtoolcallv5-3b',
           autonomy_level: 'SUPERVISED',
-          documents_count: 0
+          documents_count: 0,
+          active_beliefs_count: 0,
+          trusted_recipients: [],
+          num_ctx: 12288
         },
-        vaultDocuments: [],
-        memoryData: { spatial_summary: '', active_beliefs: [] },
+        availableModels: [],
+        detailedModels: [
+          {
+            id: 'refinedneuro/refinedtoolcallv5-3b',
+            name: 'RefinedToolCallV5 (3.1B)',
+            recommended: true,
+            tag: '★ Recommended for Tool Calling & Autonomous DAG Plans',
+            context: '12,288 tokens (Safe 12K Window - 500MB VRAM Headroom)',
+            active: true
+          },
+          {
+            id: 'hf.co/unsloth/SmolLM3-3B-GGUF:UD-Q6_K_XL',
+            name: 'SmolLM3 (3.1B)',
+            recommended: false,
+            tag: 'Conversational Specialist & Executive Drafting',
+            context: '12,288 tokens (Safe 12K Window)',
+            active: false
+          },
+          {
+            id: 'hf.co/Qwen/Qwen3-1.7B-GGUF:Q8_0',
+            name: 'Qwen3 (1.7B)',
+            recommended: false,
+            tag: 'Fast Lightweight Reasoning',
+            context: '12,288 tokens (Safe 12K Window)',
+            active: false
+          }
+        ],
+        currentPlan: null,
+        dagGoalInput: '',
         memorySearchQuery: '',
-        memorySearchResults: [],
-        inboxEmails: [],
-        previewModalOpen: false,
-        previewModalTitle: '',
-        previewModalContent: '',
-
-        init() {
-          this.fetchStatus();
-          this.fetchVaultDocuments();
-          this.fetchMemoryData();
-
-          // Configure Marked with Highlight.js
-          if (window.marked) {
-            marked.setOptions({
-              highlight: function(code, lang) {
-                if (window.hljs) {
-                  if (lang && hljs.getLanguage(lang)) {
-                    try {
-                      return hljs.highlight(code, { language: lang }).value;
-                    } catch (e) {}
-                  }
-                  try {
-                    return hljs.highlightAuto(code).value;
-                  } catch (e) {}
-                }
-                return code;
-              },
-              breaks: true,
-              gfm: true
-            });
-          }
-
-          // Global click listener for citation tags [1], [2] inside rendered Markdown
-          window.handleCitationClick = (citationId) => {
-            const cleanId = String(citationId).replace(/[\[\]]/g, '').trim();
-            let match = null;
-            if (this.executionResult && this.executionResult.citations) {
-              match = this.executionResult.citations.find(c => {
-                const cId = String(c.citation_id || '').replace(/[\[\]]/g, '').trim();
-                return cId === cleanId;
-              });
-            }
-
-            if (!match && this.executionResult && this.executionResult.final_output) {
-              // Fallback: extract source line dynamically from synthesis text
-              const text = this.executionResult.final_output;
-              const regex = new RegExp(`\\[${cleanId}\\]\\s*([^\\n\\r]+)`, 'i');
-              const found = text.match(regex);
-              if (found) {
-                const line = found[1].trim();
-                const urlMatch = line.match(/https?:\/\/[^\s\)]+/);
-                match = {
-                  citation_id: `[${cleanId}]`,
-                  title: urlMatch ? line.replace(urlMatch[0], '').trim().replace(/^[-–—:]\s*/, '') : line,
-                  url: urlMatch ? urlMatch[0] : null,
-                  snippet: line,
-                  score: 1.0
-                };
-              }
-            }
-
-            if (match) {
-              this.selectCitation(match);
-              const card = document.getElementById('citation-inspector-card');
-              if (card) {
-                card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                card.classList.add('ring-2', 'ring-brand-cyan');
-                setTimeout(() => card.classList.remove('ring-2', 'ring-brand-cyan'), 1500);
-              }
-            }
-          };
-        },
-
-        async fetchStatus() {
-          try {
-            const res = await fetch('/api/status');
-            this.status = await res.json();
-          } catch (e) {
-            console.error('Error fetching status:', e);
+        memoryNetworkFilter: 'all',
+        memoryItems: [],
+        vaultDocuments: [],
+        infra: {
+          status: 'ready',
+          services: {
+            ollama: { online: true, name: 'Ollama' },
+            elasticsearch: { online: true, name: 'Elasticsearch' },
+            searxng: { online: true, name: 'SearXNG' }
           }
         },
+        isRestartingInfra: false,
+        debugEvents: [],
+        debugSummary: { total_events: 0, error_count: 0, type_counts: {}, level_counts: {} },
+        debugFilterType: 'all',
+        debugFilterLevel: 'all',
+        debugSearchQuery: '',
+        debugExpandedEventId: null,
+        isDebugRefreshing: false,
 
-        async switchModel(newModel) {
-          try {
-            await fetch('/api/model', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ model_name: newModel })
-            });
-            this.fetchStatus();
-          } catch (e) {
-            console.error('Error switching model:', e);
-          }
+        async initApp() {
+          await this.loadStatus();
+          await this.loadModels();
+          await this.loadInfra();
+          await this.loadSessions();
+          await this.searchMemory();
+          await this.loadVault();
+          await this.loadDebugEvents();
+          setInterval(() => {
+            if (this.activeTab === 'debug') {
+              this.loadDebugEvents(true);
+            }
+          }, 3000);
         },
 
-        async togglePolicy() {
-          const current = this.status.autonomy_level;
-          const next = current === 'FULL' ? 'SUPERVISED' : 'FULL';
-          this.status.autonomy_level = next; // Instant optimistic UI update
+        async loadDebugEvents(silent = false) {
+          if (!silent) this.isDebugRefreshing = true;
           try {
-            const res = await fetch('/api/policy', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ autonomy_level: next })
-            });
-            const data = await res.json();
-            if (data && data.autonomy_level) {
-              this.status.autonomy_level = data.autonomy_level;
+            let url = `/api/debug/events?limit=200`;
+            if (this.debugFilterType !== 'all') url += `&event_type=${this.debugFilterType}`;
+            if (this.debugFilterLevel !== 'all') url += `&level=${this.debugFilterLevel}`;
+            if (this.debugSearchQuery) url += `&search=${encodeURIComponent(this.debugSearchQuery)}`;
+            const res = await fetch(url);
+            if (res.ok) {
+              const data = await res.json();
+              this.debugEvents = data.events || [];
+              this.debugSummary = data.summary || this.debugSummary;
             }
           } catch (e) {
-            console.error('Error toggling policy:', e);
-            this.status.autonomy_level = current; // Rollback on error
-          }
-        },
-
-        async generatePlanOnly() {
-          if (!this.goalInput.trim() || this.planning || this.executing) return;
-          this.planning = true;
-          this.errorMessage = '';
-          this.activePlan = null;
-          this.executionResult = null;
-          try {
-            const res = await fetch('/api/plan', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ goal: this.goalInput })
-            });
-            if (!res.ok) {
-              const err = await res.json();
-              throw new Error(err.detail || 'Plan formulation failed');
-            }
-            const data = await res.json();
-            if (data && data.steps) {
-              this.activePlan = data;
-            } else {
-              throw new Error('Received invalid plan structure');
-            }
-          } catch (e) {
-            console.error('Error generating plan:', e);
-            this.errorMessage = 'Plan Generation Error: ' + (e.message || e);
+            console.debug('Debug events load error:', e);
           } finally {
-            this.planning = false;
+            if (!silent) this.isDebugRefreshing = false;
           }
         },
 
-        async executeCurrentGoal() {
-          if (!this.goalInput.trim() || this.executing || this.planning) return;
-          this.executing = true;
-          this.errorMessage = '';
-          this.executionResult = null;
-          this.selectedCitation = null;
-
+        async clearDebugEvents() {
           try {
-            const res = await fetch('/api/execute', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ goal: this.goalInput })
+            await fetch('/api/debug/clear', { method: 'POST' });
+            this.debugEvents = [];
+            this.debugSummary = { total_events: 0, error_count: 0, type_counts: {}, level_counts: {} };
+            this.showToast('Debug trace buffer cleared.');
+          } catch (e) {
+            console.error('Clear debug error:', e);
+          }
+        },
+
+        toggleEventExpand(id) {
+          this.debugExpandedEventId = this.debugExpandedEventId === id ? null : id;
+        },
+
+        copyToClipboard(text) {
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(() => {
+              this.showToast('Copied JSON to clipboard');
             });
-            if (!res.ok) {
-              const err = await res.json();
-              throw new Error(err.detail || 'Execution failed');
+          }
+        },
+
+        async loadInfra() {
+          try {
+            const res = await fetch('/api/infra/status');
+            if (res.ok) {
+              this.infra = await res.json();
             }
-            const data = await res.json();
-            this.activePlan = { goal: data.goal, steps: data.steps };
-            this.executionResult = data;
-            if (data.citations && data.citations.length > 0) {
-              this.selectedCitation = data.citations[0];
-            }
-            this.fetchStatus();
-            this.fetchVaultDocuments();
           } catch (e) {
-            console.error('Execution error:', e);
-            this.errorMessage = 'Execution Error: ' + (e.message || e);
+            console.debug('Failed to load infra status', e);
+          }
+        },
+
+        async restartInfra() {
+          this.isRestartingInfra = true;
+          try {
+            const res = await fetch('/api/infra/restart', { method: 'POST' });
+            if (res.ok) {
+              this.infra = await res.json();
+              this.showToast('Infrastructure verified & online!');
+            }
+          } catch (e) {
+            this.showToast('Infra check failed: ' + e);
           } finally {
-            this.executing = false;
+            this.isRestartingInfra = false;
           }
         },
 
-        selectCitation(cit) {
-          this.selectedCitation = cit;
+        showToast(msg) {
+          this.toastMessage = msg;
+          setTimeout(() => { this.toastMessage = ''; }, 3000);
         },
 
-        async fetchVaultDocuments() {
-          try {
-            const res = await fetch('/api/vault');
-            const data = await res.json();
-            this.vaultDocuments = data.documents || [];
-          } catch (e) {
-            console.error('Error fetching vault:', e);
-          }
+        formatModelName(name) {
+          if (!name) return 'RefinedToolCallV5 (3B)';
+          if (name.includes('refinedtoolcall')) return 'RefinedToolCallV5 (3B)';
+          if (name.includes('SmolLM3')) return 'SmolLM3 (3B)';
+          if (name.includes('Qwen3')) return 'Qwen3 (1.7B)';
+          return name.split('/').pop().split(':')[0];
         },
 
-        async inspectParsedDoc(docId) {
-          try {
-            const res = await fetch(`/api/vault/${docId}`);
-            const data = await res.json();
-            this.previewModalTitle = `Parsed Document: ${data.filename}`;
-            this.previewModalContent = data.parsed_markdown || 'No parsed markdown available.';
-            this.previewModalOpen = true;
-          } catch (e) {
-            console.error('Error inspecting doc:', e);
-          }
-        },
-
-        async handleFileDrop(e) {
-          const files = e.dataTransfer.files;
-          if (files.length > 0) this.uploadFile(files[0]);
-        },
-
-        uploadSelectedFile(e) {
-          if (e.target.files.length > 0) this.uploadFile(e.target.files[0]);
-        },
-
-        async uploadFile(file) {
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('parse_and_index', 'true');
-          try {
-            await fetch('/api/vault/upload', { method: 'POST', body: formData });
-            this.fetchVaultDocuments();
-            this.fetchStatus();
-          } catch (e) {
-            console.error('Upload error:', e);
-          }
-        },
-
-        async fetchMemoryData() {
-          try {
-            const res = await fetch('/api/memory');
-            this.memoryData = await res.json();
-          } catch (e) {
-            console.error('Error fetching memory:', e);
-          }
-        },
-
-        async searchMemory() {
-          if (!this.memorySearchQuery.trim()) {
-            this.memorySearchResults = [];
-            return;
-          }
-          try {
-            const res = await fetch(`/api/memory?query=${encodeURIComponent(this.memorySearchQuery)}`);
-            const data = await res.json();
-            this.memorySearchResults = data.results || [];
-          } catch (e) {
-            console.error('Memory search error:', e);
-          }
-        },
-
-        async fetchMailInbox() {
-          try {
-            const res = await fetch('/api/mail/inbox');
-            const data = await res.json();
-            this.inboxEmails = data.emails || [];
-          } catch (e) {
-            console.error('Mail fetch error:', e);
-          }
+        formatTime(ts) {
+          if (!ts) return '';
+          const d = new Date(ts * 1000);
+          return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         },
 
         renderMathAndMarkdown(md) {
@@ -951,7 +1191,7 @@
 
           // 4. Interactive citation badges [1], [2], etc.
           html = html.replace(/\[(\d+)\]/g, (match, num) => {
-            return `<button type="button" class="citation-tag inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded text-xs font-mono font-bold bg-cyan-950/60 border border-brand-cyan/50 text-brand-cyan hover:bg-brand-cyan hover:text-gray-950 transition cursor-pointer shadow-sm" onclick="window.handleCitationClick('${num}')">[${num}]</button>`;
+            return `<button type="button" class="citation-tag inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded text-xs font-mono font-bold bg-teal-950/60 border border-teal-500/50 text-teal-400 hover:bg-teal-500 hover:text-gray-950 transition cursor-pointer shadow-sm" onclick="window.handleCitationClick('${num}')">[${num}]</button>`;
           });
 
           return html;
@@ -965,18 +1205,247 @@
           return this.renderMathAndMarkdown(md);
         },
 
-        copySynthesis() {
-          if (this.executionResult && this.executionResult.final_output) {
-            navigator.clipboard.writeText(this.executionResult.final_output);
-          }
-        },
-
         formatBytes(bytes) {
           if (!bytes) return '0 B';
           const k = 1024;
           const sizes = ['B', 'KB', 'MB', 'GB'];
           const i = Math.floor(Math.log(bytes) / Math.log(k));
           return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        },
+
+        async loadStatus() {
+          try {
+            const res = await fetch('/api/status');
+            if (res.ok) {
+              this.status = await res.json();
+            }
+          } catch (e) {
+            console.error('Status fetch error:', e);
+          }
+        },
+
+        async loadModels() {
+          try {
+            const res = await fetch('/api/models');
+            if (res.ok) {
+              const data = await res.json();
+              if (data.detailed_models && data.detailed_models.length) {
+                this.detailedModels = data.detailed_models;
+              }
+              if (data.active_model) {
+                this.status.model_name = data.active_model;
+              }
+            }
+          } catch (e) {
+            console.error('Models fetch error:', e);
+          }
+        },
+
+        async switchModel(modelName) {
+          try {
+            const res = await fetch('/api/model', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model_name: modelName })
+            });
+            if (res.ok) {
+              this.status.model_name = modelName;
+              this.showToast(`Switched active model to ${this.formatModelName(modelName)} (8K context active)`);
+              this.showModelModal = false;
+              await this.loadModels();
+            }
+          } catch (e) {
+            console.error('Model switch error:', e);
+          }
+        },
+
+        async togglePolicy() {
+          const next = this.status.autonomy_level === 'FULL' ? 'SUPERVISED' : 'FULL';
+          try {
+            const res = await fetch('/api/policy', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ autonomy_level: next })
+            });
+            if (res.ok) {
+              this.status.autonomy_level = next;
+              this.showToast(`Autonomy policy updated to ${next}`);
+            }
+          } catch (e) {
+            console.error('Policy toggle error:', e);
+          }
+        },
+
+        async loadSessions() {
+          try {
+            const res = await fetch('/api/sessions');
+            if (res.ok) {
+              const data = await res.json();
+              this.sessions = data.sessions || [];
+            }
+          } catch (e) {
+            console.error('Sessions error:', e);
+          }
+        },
+
+        async switchSession(sessId) {
+          this.currentSessionId = sessId;
+          await this.loadSessionChat(sessId);
+        },
+
+        startNewSession() {
+          this.currentSessionId = 'session_' + Math.random().toString(36).substring(2, 8);
+          this.chatMessages = [];
+          this.showToast('Started fresh dialogue session');
+        },
+
+        async clearCurrentSession(sessId) {
+          try {
+            await fetch(`/api/session/${sessId}`, { method: 'DELETE' });
+            if (this.currentSessionId === sessId) {
+              this.chatMessages = [];
+            }
+            await this.loadSessions();
+            this.showToast(`Cleared dialogue drawer: ${sessId}`);
+          } catch (e) {
+            console.error('Clear session error:', e);
+          }
+        },
+
+        async loadSessionChat(sessId) {
+          try {
+            const res = await fetch(`/api/session/${sessId}`);
+            if (res.ok) {
+              const data = await res.json();
+              this.chatMessages = (data.turns || []).map(t => ({
+                role: t.role,
+                content: t.content,
+                timestamp: t.created_at,
+                plan: null
+              }));
+              this.scrollChat();
+            }
+          } catch (e) {
+            console.error('Session chat error:', e);
+          }
+        },
+
+        scrollChat() {
+          this.$nextTick(() => {
+            const el = document.getElementById('chatStream');
+            if (el) el.scrollTop = el.scrollHeight;
+          });
+        },
+
+        sendQuickPrompt(text) {
+          this.chatInput = text;
+          this.sendMessage();
+        },
+
+        async sendMessage() {
+          const text = this.chatInput.trim();
+          if (!text || this.isThinking) return;
+
+          this.chatMessages.push({
+            role: 'user',
+            content: text,
+            timestamp: Date.now() / 1000
+          });
+          this.chatInput = '';
+          this.isThinking = true;
+          this.thinkingStatus = 'Analyzing intent and memory context...';
+          this.scrollChat();
+
+          try {
+            const res = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                message: text,
+                session_id: this.currentSessionId
+              })
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              this.chatMessages.push({
+                role: 'assistant',
+                content: data.message || '',
+                timestamp: Date.now() / 1000,
+                plan: data.plan || null
+              });
+              if (data.plan) {
+                this.currentPlan = data.plan;
+              }
+              await this.loadSessions();
+            } else {
+              this.chatMessages.push({
+                role: 'assistant',
+                content: `Execution error: ${res.statusText}`,
+                timestamp: Date.now() / 1000
+              });
+            }
+          } catch (err) {
+            this.chatMessages.push({
+              role: 'assistant',
+              content: `Network or inference error: ${err}`,
+              timestamp: Date.now() / 1000
+            });
+          } finally {
+            this.isThinking = false;
+            this.scrollChat();
+          }
+        },
+
+        async executeGoalDirect(goal) {
+          if (!goal.trim()) return;
+          this.isThinking = true;
+          try {
+            const res = await fetch('/api/execute', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ goal: goal, session_id: this.currentSessionId })
+            });
+            if (res.ok) {
+              const plan = await res.json();
+              this.currentPlan = plan;
+              this.showToast('Operations DAG completed successfully!');
+            }
+          } catch (e) {
+            console.error('DAG execution error:', e);
+          } finally {
+            this.isThinking = false;
+          }
+        },
+
+        async searchMemory() {
+          try {
+            let url = '/api/memory';
+            const params = [];
+            if (this.memorySearchQuery.trim()) params.push(`query=${encodeURIComponent(this.memorySearchQuery.trim())}`);
+            if (this.memoryNetworkFilter !== 'all') params.push(`network=${this.memoryNetworkFilter}`);
+            if (params.length) url += '?' + params.join('&');
+
+            const res = await fetch(url);
+            if (res.ok) {
+              const data = await res.json();
+              this.memoryItems = data.memories || [];
+            }
+          } catch (e) {
+            console.error('Memory fetch error:', e);
+          }
+        },
+
+        async loadVault() {
+          try {
+            const res = await fetch('/api/vault/documents');
+            if (res.ok) {
+              const data = await res.json();
+              this.vaultDocuments = data.documents || [];
+            }
+          } catch (e) {
+            console.error('Vault fetch error:', e);
+          }
         }
       }
     }

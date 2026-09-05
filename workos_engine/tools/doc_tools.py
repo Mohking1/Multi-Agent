@@ -7,10 +7,28 @@ import os
 import time
 from typing import Any
 
-from docling.chunking import HybridChunker
-from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions, TableFormerMode
-from docling.document_converter import DocumentConverter, PdfFormatOption
+try:
+    from docling.chunking import HybridChunker
+    from docling.datamodel.base_models import InputFormat
+    from docling.datamodel.pipeline_options import (
+        AcceleratorDevice,
+        AcceleratorOptions,
+        PdfPipelineOptions,
+        TableFormerMode,
+    )
+    from docling.document_converter import DocumentConverter, PdfFormatOption
+
+    HAS_DOCLING = True
+except ImportError:
+    HybridChunker = None  # type: ignore
+    InputFormat = None  # type: ignore
+    PdfPipelineOptions = None  # type: ignore
+    TableFormerMode = None  # type: ignore
+    AcceleratorOptions = None  # type: ignore
+    AcceleratorDevice = None  # type: ignore
+    DocumentConverter = None  # type: ignore
+    PdfFormatOption = None  # type: ignore
+    HAS_DOCLING = False
 
 from config import WorkOSConfig, get_config
 from workos_engine.vault import DocumentVault
@@ -23,7 +41,7 @@ class DocToolKit:
 
     def __init__(self, config: WorkOSConfig | None = None, vault: DocumentVault | None = None):
         self.config = config or get_config()
-        self.vault = vault or DocumentVault()
+        self.vault = vault or DocumentVault(vault_dir=self.config.vault_dir)
         self._documents: dict[str, dict[str, Any]] = {}
 
     def _generate_doc_id(self, file_path: str) -> str:
@@ -35,27 +53,38 @@ class DocToolKit:
 
     def _get_converter(self, ocr: bool = False, table_former: bool = True) -> DocumentConverter:
         """Instantiates a Docling DocumentConverter with configured pipeline options."""
+        if not HAS_DOCLING or DocumentConverter is None or PdfPipelineOptions is None:
+            raise RuntimeError(
+                "Docling is not installed. Please install docling to use document parsing tools."
+            )
+
         pipeline_options = PdfPipelineOptions()
         pipeline_options.do_ocr = ocr
         pipeline_options.do_table_structure = table_former
         if table_former:
             pipeline_options.table_structure_options.mode = TableFormerMode.ACCURATE
 
+        if AcceleratorOptions is not None and AcceleratorDevice is not None:
+            pipeline_options.accelerator_options = AcceleratorOptions(
+                num_threads=4, device=AcceleratorDevice.CPU
+            )
+
         format_options = {InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
         return DocumentConverter(format_options=format_options)
 
     def parse_document(
         self,
-        file_path: str,
+        file_path: str | list[str],
         output_format: str = "markdown",
         ocr: bool = False,
         table_former: bool = True,
         doc_id: str | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
-        """Parses a document file (PDF, DOCX, PPTX, HTML, Markdown, Images) into structured content.
+        """Parses a document file or list of files (PDF, DOCX, PPTX, HTML, Markdown, Images) into structured content.
 
         Args:
-            file_path: Path to the document file.
+            file_path: Path to the document file or list of file paths.
             output_format: Desired output format ('markdown', 'json', 'text', 'html', 'doctags').
             ocr: Whether to run OCR for scanned pages/images.
             table_former: Whether to use TableFormer for high-fidelity table extraction.
@@ -64,6 +93,57 @@ class DocToolKit:
         Returns:
             Dictionary containing document ID, metadata, tables count, figures count, and parsed content.
         """
+        if isinstance(file_path, list):
+            if not file_path:
+                return {
+                    "doc_id": "empty_batch",
+                    "file_path": "",
+                    "file_paths": [],
+                    "content": "No files provided to parse.",
+                    "num_documents": 0,
+                    "documents": [],
+                }
+            if len(file_path) == 1:
+                return self.parse_document(
+                    file_path=file_path[0],
+                    output_format=output_format,
+                    ocr=ocr,
+                    table_former=table_former,
+                    doc_id=doc_id,
+                )
+            # Batch parse multiple documents
+            doc_results = []
+            combined_content_parts = []
+            total_tables = 0
+            total_figures = 0
+            for p in file_path:
+                single_res = self.parse_document(
+                    file_path=p,
+                    output_format=output_format,
+                    ocr=ocr,
+                    table_former=table_former,
+                )
+                doc_results.append(single_res)
+                total_tables += single_res.get("tables_count", 0)
+                total_figures += single_res.get("figures_count", 0)
+                fname = os.path.basename(p)
+                combined_content_parts.append(
+                    f"### Document: {fname}\n\n{single_res.get('content', '')}"
+                )
+
+            batch_id = f"batch_{int(time.time())}_{len(file_path)}"
+            return {
+                "doc_id": batch_id,
+                "file_path": file_path[0] if file_path else "",
+                "file_paths": file_path,
+                "num_documents": len(doc_results),
+                "format": output_format,
+                "content": "\n\n---\n\n".join(combined_content_parts),
+                "tables_count": total_tables,
+                "figures_count": total_figures,
+                "documents": doc_results,
+            }
+
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Document file not found: {file_path}")
 

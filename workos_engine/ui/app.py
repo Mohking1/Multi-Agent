@@ -4,6 +4,7 @@ import logging
 import os
 import shutil
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -14,6 +15,10 @@ from pydantic import BaseModel
 
 from config import WorkOSConfig, get_config
 from workos_engine import __version__
+from workos_engine.infra_manager import (
+    ensure_all_infrastructure,
+    get_infrastructure_status,
+)
 from workos_engine.memory.networks import CognitiveMemoryEngine
 from workos_engine.planner import ExecutivePlanner
 from workos_engine.types import AutonomyLevel, MemoryNetwork
@@ -21,10 +26,23 @@ from workos_engine.vault import DocumentVault
 
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Ensure backing infrastructure is running when app starts
+    if getattr(config, "auto_start_infrastructure", True):
+        try:
+            ensure_all_infrastructure(verbose=False)
+        except Exception as e:
+            logger.warning(f"Startup infrastructure initialization error: {e}")
+    yield
+
+
 app = FastAPI(
     title="WorkOS — Executive AI Operating System",
     description="Minimalist Autonomous Multi-Agent OS with 4-Network Memory & Document Vault",
     version=__version__,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -37,7 +55,17 @@ app.add_middleware(
 
 # Global WorkOS engine instances
 config: WorkOSConfig = get_config()
-vault: DocumentVault = DocumentVault()
+vault: DocumentVault | None = None
+
+
+def get_vault() -> DocumentVault:
+    global vault
+    if vault is not None:
+        return vault
+    target_dir = os.getenv("WORKOS_VAULT_DIR") or config.vault_dir
+    return DocumentVault(vault_dir=target_dir)
+
+
 planner: ExecutivePlanner = ExecutivePlanner(config=config)
 memory: CognitiveMemoryEngine = planner.memory
 
@@ -50,6 +78,12 @@ if STATIC_DIR.exists():
 class GoalRequest(BaseModel):
     goal: str
     plan_only: bool = False
+    session_id: str | None = None
+
+
+class ChatRequest(BaseModel):
+    message: str
+    session_id: str | None = None
 
 
 class PolicyUpdateRequest(BaseModel):
@@ -98,7 +132,7 @@ async def get_system_status():
         if is_ollama_online:
             available_models = ollama_client.list_models()
 
-    docs = vault.list_documents()
+    docs = get_vault().list_documents()
     active_beliefs = memory.get_active_beliefs()
 
     return {
@@ -112,6 +146,7 @@ async def get_system_status():
         "trusted_recipients": config.trusted_recipients,
         "documents_count": len(docs),
         "active_beliefs_count": len(active_beliefs),
+        "num_ctx": config.num_ctx,
         "agents": list(planner.agents.keys()),
     }
 
@@ -132,6 +167,59 @@ async def update_policy(req: PolicyUpdateRequest):
     return {"status": "success", "autonomy_level": new_level.value}
 
 
+@app.get("/api/models")
+async def get_available_models():
+    """Returns the list of installed and supported Ollama models with metadata and recommendations."""
+    models = []
+    try:
+        import httpx
+
+        with httpx.Client(timeout=5.0) as client:
+            res = client.get(f"{config.ollama_base_url}/api/tags")
+            if res.status_code == 200:
+                data = res.json()
+                for m in data.get("models", []):
+                    name = m.get("name")
+                    if name:
+                        models.append(name)
+    except Exception as e:
+        logger.debug(f"Failed to fetch Ollama tags: {e}")
+
+    if not models:
+        models = [
+            "refinedneuro/refinedtoolcallv5-3b",
+            "hf.co/unsloth/SmolLM3-3B-GGUF:UD-Q6_K_XL",
+            "hf.co/Qwen/Qwen3-1.7B-GGUF:Q8_0",
+        ]
+
+    structured = []
+    for m in models:
+        is_primary = "refinedtoolcall" in m.lower()
+        is_smol = "smollm" in m.lower()
+        structured.append(
+            {
+                "id": m,
+                "name": "RefinedToolCallV5 (3.1B)"
+                if is_primary
+                else ("SmolLM3 (3.1B)" if is_smol else m.split("/")[-1].split(":")[0]),
+                "recommended": is_primary,
+                "tag": "★ Recommended (Precision Tool Calling & DAG)"
+                if is_primary
+                else ("Conversational Specialist" if is_smol else "Lightweight / Fast"),
+                "context": f"{config.num_ctx:,} tokens (Safe 12K Window - 500MB VRAM Headroom)",
+                "active": m == config.model_name
+                or (is_primary and "refinedtoolcall" in config.model_name.lower()),
+            }
+        )
+
+    return {
+        "models": models,
+        "active_model": config.model_name,
+        "num_ctx": config.num_ctx,
+        "detailed_models": structured,
+    }
+
+
 @app.post("/api/model")
 async def update_model(req: ModelUpdateRequest):
     if not req.model_name.strip():
@@ -144,10 +232,91 @@ async def update_model(req: ModelUpdateRequest):
     return {"status": "success", "model_name": config.model_name}
 
 
+@app.get("/api/infra/status")
+async def get_infra_status_endpoint():
+    """Returns real-time health of Ollama, Elasticsearch, SearXNG, and Docker."""
+    return get_infrastructure_status()
+
+
+@app.post("/api/infra/restart")
+async def restart_infra_endpoint():
+    """Triggers auto-start/restart for any offline infrastructure services."""
+    status = ensure_all_infrastructure(verbose=False)
+    return status
+
+
+@app.post("/api/chat")
+async def chat_endpoint(req: ChatRequest):
+    """Conversational chat endpoint — routes between conversational and agent execution."""
+    if not req.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    sess_id = req.session_id or "web_session"
+    try:
+        result = await planner.chat_turn(message=req.message, session_id=sess_id)
+        return result
+    except Exception as e:
+        logger.exception(f"Chat turn error: {e}")
+        from workos_engine.debug import get_tracer
+
+        get_tracer().log_error(
+            "ui.chat_endpoint", e, context={"message": req.message, "session_id": sess_id}
+        )
+        return {
+            "type": "error",
+            "message": f"Execution notice: {e}",
+            "session_id": sess_id,
+            "error": str(e),
+        }
+
+
+@app.get("/api/debug/events")
+async def get_debug_events_endpoint(
+    limit: int = 100,
+    event_type: str | None = None,
+    session_id: str | None = None,
+    level: str | None = None,
+    search: str | None = None,
+):
+    """Fetches real-time structured debug trace events."""
+    from workos_engine.debug import get_tracer
+
+    tracer = get_tracer()
+    return {
+        "summary": tracer.get_summary(),
+        "events": tracer.get_events(
+            limit=limit, event_type=event_type, session_id=session_id, level=level, search=search
+        ),
+    }
+
+
+@app.post("/api/debug/clear")
+async def clear_debug_events_endpoint():
+    """Clears in-memory debug trace buffer."""
+    from workos_engine.debug import get_tracer
+
+    cleared = get_tracer().clear()
+    return {"status": "cleared", "count": cleared}
+
+
+@app.get("/api/debug/download")
+async def download_debug_log_endpoint():
+    """Downloads the full workos_debug.log file."""
+    from workos_engine.debug import get_tracer
+
+    log_path = get_tracer().log_file
+    if not log_path.exists():
+        raise HTTPException(status_code=404, detail="Debug log file not yet created.")
+    return FileResponse(
+        path=str(log_path),
+        filename="workos_debug.log",
+        media_type="text/plain",
+    )
+
+
 @app.post("/api/plan")
 async def generate_plan_endpoint(req: GoalRequest):
     """Generates dynamic execution DAG for a goal without executing it."""
-    context = planner.build_planning_context(req.goal)
+    context = planner.build_planning_context(req.goal, session_id=req.session_id)
     plan = planner.generate_plan(req.goal, context=context)
     return {
         "goal": plan.goal,
@@ -170,12 +339,13 @@ async def execute_goal_endpoint(req: GoalRequest):
     if not req.goal.strip():
         raise HTTPException(status_code=400, detail="Goal cannot be empty")
 
+    sess_id = req.session_id or "web_session"
     if req.plan_only:
-        context = planner.build_planning_context(req.goal)
+        context = planner.build_planning_context(req.goal, session_id=sess_id)
         plan = planner.generate_plan(req.goal, context=context)
         return {"plan": plan, "executed": False}
 
-    plan = await planner.run_goal(req.goal)
+    plan = await planner.run_goal(req.goal, session_id=sess_id)
 
     # Collect any citations produced during RAG and Web research steps
     citations = []
@@ -259,6 +429,38 @@ async def execute_goal_endpoint(req: GoalRequest):
     }
 
 
+@app.get("/api/sessions")
+async def list_sessions_endpoint():
+    """Lists all active conversation sessions and turn counts."""
+    return {"sessions": memory.list_sessions()}
+
+
+@app.get("/api/session/{session_id}")
+async def get_session_endpoint(session_id: str):
+    """Retrieves verbatim conversation turns for a session (MemPalace drawer)."""
+    turns = memory.get_session_dialogue(session_id=session_id, limit=50)
+    return {
+        "session_id": session_id,
+        "turns": [
+            {
+                "id": t.id,
+                "role": t.role,
+                "content": t.content,
+                "created_at": t.created_at,
+                "metadata": t.metadata,
+            }
+            for t in turns
+        ],
+    }
+
+
+@app.delete("/api/session/{session_id}")
+async def clear_session_endpoint(session_id: str):
+    """Clears conversation turns for a session."""
+    deleted = memory.clear_session(session_id=session_id)
+    return {"status": "success", "session_id": session_id, "deleted_turns": deleted}
+
+
 @app.get("/api/memory")
 async def get_memory_data(
     query: str | None = None, wing: str | None = None, network: str | None = None
@@ -330,9 +532,10 @@ async def add_memory_item(req: MemoryAddRequest):
 
 
 @app.get("/api/vault")
+@app.get("/api/vault/documents")
 async def list_vault_documents():
     """Lists all permanently stored original documents in the Vault."""
-    docs = vault.list_documents()
+    docs = get_vault().list_documents()
     return {
         "documents": [
             {
@@ -356,11 +559,11 @@ async def list_vault_documents():
 @app.get("/api/vault/{doc_id}")
 async def get_vault_document_details(doc_id: str):
     """Retrieves document metadata, original file info, and parsed markdown content."""
-    doc = vault.get_document(doc_id)
+    doc = get_vault().get_document(doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found in vault")
 
-    parsed_md = vault.get_parsed_content(doc_id)
+    parsed_md = get_vault().get_parsed_content(doc_id)
     return {
         "doc_id": doc.doc_id,
         "filename": doc.filename,
@@ -377,7 +580,7 @@ async def get_vault_document_details(doc_id: str):
 @app.get("/api/vault/{doc_id}/file")
 async def download_vault_file(doc_id: str):
     """Serves the original raw stored file for in-browser preview or download."""
-    doc = vault.get_document(doc_id)
+    doc = get_vault().get_document(doc_id)
     if not doc or not Path(doc.vault_path).exists():
         raise HTTPException(status_code=404, detail="Original document file not found")
 
@@ -403,7 +606,7 @@ async def upload_document_to_vault(
 
     try:
         # 1. Store in vault with preserved original filename
-        vault_doc = vault.store_document(
+        vault_doc = get_vault().store_document(
             tmp_path,
             filename=file.filename,
             metadata={"original_upload_name": file.filename},

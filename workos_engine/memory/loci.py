@@ -21,6 +21,14 @@ class SpatialLociManager:
         norm_hall = (hall or "general").strip().lower().replace(" ", "_")
         return norm_wing or "general", norm_hall or "general"
 
+    # Table-driven topic routing rules (keywords_set, wing, hall)
+    ROUTING_RULES: list[tuple[tuple[str, ...], str, str]] = [
+        (("person", "who is", "contact", "email", "phone", "colleague", "role", "manager", "accountant"), "people", "contacts"),
+        (("prefer", "format", "style", "always", "never", "summarize as", "bullet points", "paragraphs"), "workflows", "preferences"),
+        (("architecture", "decision", "database", "framework", "refactor", "roadmap", "task"), "projects", "decisions"),
+        (("python", "sqlite", "elasticsearch", "docling", "api", "protocol", "fact"), "knowledge", "general"),
+    ]
+
     def route_topic(
         self,
         topic: str,
@@ -28,74 +36,12 @@ class SpatialLociManager:
         default_hall: str = "general",
     ) -> tuple[str, str]:
         """
-        Heuristically suggests a spatial locus (wing, hall) based on content keywords.
+        Maps a topic to a spatial locus (wing, hall) using declarative routing rules.
         """
         topic_lower = topic.lower()
-
-        # People routing
-        if any(
-            k in topic_lower
-            for k in [
-                "person",
-                "who is",
-                "contact",
-                "email",
-                "phone",
-                "colleague",
-                "role",
-                "manager",
-                "accountant",
-            ]
-        ):
-            if any(k in topic_lower for k in ["role", "title", "position"]):
-                return "people", "contacts"
-            return "people", "contacts"
-
-        # Workflow preferences
-        if any(
-            k in topic_lower
-            for k in [
-                "prefer",
-                "format",
-                "style",
-                "always",
-                "never",
-                "summarize as",
-                "bullet points",
-                "paragraphs",
-            ]
-        ):
-            return "workflows", "preferences"
-
-        # Project decisions & architecture
-        if any(
-            k in topic_lower
-            for k in [
-                "architecture",
-                "decision",
-                "database",
-                "framework",
-                "refactor",
-                "roadmap",
-                "task",
-            ]
-        ):
-            return "projects", "decisions"
-
-        # Knowledge
-        if any(
-            k in topic_lower
-            for k in [
-                "python",
-                "sqlite",
-                "elasticsearch",
-                "docling",
-                "api",
-                "protocol",
-                "fact",
-            ]
-        ):
-            return "knowledge", "general"
+        for keywords, wing, hall in self.ROUTING_RULES:
+            if any(k in topic_lower for k in keywords):
+                return wing, hall
 
         return default_wing, default_hall
 

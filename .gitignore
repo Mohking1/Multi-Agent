@@ -6,7 +6,6 @@ venv/
 .vscode/
 data/
 *.log
-*.db
-.superpowers/
-.pytest_cache/
+*.db*
 .agents/
+downloads/

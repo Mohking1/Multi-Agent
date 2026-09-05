@@ -15,10 +15,27 @@ class WorkOSConfig:
         default_factory=lambda: os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     )
     model_name: str = field(
-        default_factory=lambda: os.getenv("MODEL_NAME", "hf.co/unsloth/SmolLM3-3B-GGUF:UD-Q6_K_XL")
+        default_factory=lambda: os.getenv("MODEL_NAME", "refinedneuro/refinedtoolcallv5-3b")
     )
     embedding_model: str = field(
         default_factory=lambda: os.getenv("EMBEDDING_MODEL", "bge-m3:latest")
+    )
+    default_temperature: float = field(
+        default_factory=lambda: float(os.getenv("DEFAULT_TEMPERATURE", "0.6"))
+    )
+    top_p: float = field(default_factory=lambda: float(os.getenv("TOP_P", "0.95")))
+    repeat_penalty: float = field(default_factory=lambda: float(os.getenv("REPEAT_PENALTY", "1.1")))
+    num_ctx: int = field(default_factory=lambda: int(os.getenv("NUM_CTX", "6144")))
+
+    # Gemini & Cloud LLM API (optional, non-default)
+    gemini_api_key: str = field(
+        default_factory=lambda: os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
+    )
+    gemini_model: str = field(
+        default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+    )
+    llm_provider: str = field(
+        default_factory=lambda: os.getenv("LLM_PROVIDER", "ollama").lower()
     )
 
     # Autonomy & Decision Policy
@@ -36,6 +53,12 @@ class WorkOSConfig:
     # Cognitive Memory
     memory_db_path: str = field(
         default_factory=lambda: os.getenv("WORKOS_MEMORY_DB", "workos_memory.db")
+    )
+    vault_dir: str = field(default_factory=lambda: os.getenv("WORKOS_VAULT_DIR", "data/vault"))
+    auto_start_infrastructure: bool = field(
+        default_factory=lambda: (
+            os.getenv("WORKOS_AUTO_START_INFRA", "true").lower() not in ("0", "false", "no", "off")
+        )
     )
 
     # Elasticsearch RAG

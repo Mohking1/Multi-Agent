@@ -229,7 +229,7 @@ class RAGToolKit:
         else:
             from workos_engine.vault import DocumentVault
 
-            self.vault = DocumentVault()
+            self.vault = DocumentVault(vault_dir=self.config.vault_dir)
 
         if model_client is not None:
             self.model_client = model_client
@@ -246,15 +246,11 @@ class RAGToolKit:
             self.es = self._init_elasticsearch()
 
     def _init_model_client(self) -> Any:
-        """Initializes OllamaClient for RAG embeddings and generation."""
+        """Initializes configured LLM client for RAG embeddings and generation."""
         try:
-            from workos_engine.llm_client import OllamaClient
+            from workos_engine.llm_client import get_llm_client
 
-            return OllamaClient(
-                base_url=self.config.ollama_base_url,
-                default_model=self.config.model_name,
-                embedding_model=self.config.embedding_model,
-            )
+            return get_llm_client(self.config)
         except Exception:
             return None
 

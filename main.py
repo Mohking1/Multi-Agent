@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import inspect
 import shlex
+import uuid
 from typing import Any
 
 from rich.box import ROUNDED
@@ -45,10 +46,11 @@ class WorkOSApp:
         self.planner = planner or ExecutivePlanner(config=self.config)
         self.memory: CognitiveMemoryEngine = self.planner.memory
         self.running: bool = True
+        self.session_id: str = f"cli_{uuid.uuid4().hex[:8]}"
 
     def display_banner(self) -> None:
         """Renders the executive WorkOS banner and active system status."""
-        title = Text("WorkOS — Personal Executive AI Operating System", style="bold cyan")
+        title = Text("WorkOS — Autonomous Executive AI Operating System", style="bold cyan")
         subtitle = Text(
             f"v{__version__} | Autonomous Multi-Agent Orchestration & Cognitive Memory",
             style="dim white",
@@ -78,8 +80,8 @@ class WorkOSApp:
         status_table.add_row(
             "Memory DB:",
             f"{self.config.memory_db_path}",
-            "Elasticsearch:",
-            f"{self.config.elasticsearch_url}",
+            "Session ID:",
+            f"[cyan]{self.session_id}[/]",
         )
         status_table.add_row(
             "Subagents:",
@@ -114,6 +116,11 @@ class WorkOSApp:
         table.add_row("/policy", "[FULL | SUPERVISED]", "View or switch system autonomy policy")
         table.add_row("/plan", "<goal>", "Preview dynamic execution plan without executing")
         table.add_row(
+            "/session",
+            "[new | clear | list | history]",
+            "Manage multi-turn conversation sessions (MemPalace drawers)",
+        )
+        table.add_row(
             "/memory",
             "[summary | loci]",
             "Display spatial Loci memory architecture summary",
@@ -136,6 +143,11 @@ class WorkOSApp:
             "/mail send",
             "<to> <subject> <body>",
             "Send email (subject to autonomy policy)",
+        )
+        table.add_row(
+            "/mail organize",
+            "<category> [sender/query] [since]",
+            "Organize emails into category folder",
         )
         table.add_row("/doc parse", "<file_path>", "Parse document using Docling parser")
         table.add_row("/doc tables", "<file_path>", "Extract structured tables from document")
@@ -197,18 +209,24 @@ class WorkOSApp:
             return await res
         return res
 
-    async def execute_goal(self, goal: str, plan_only: bool = False) -> ExecutionPlan:
+    async def execute_goal(
+        self, goal: str, plan_only: bool = False, session_id: str | None = None
+    ) -> ExecutionPlan:
         """
-        Generates and executes an ExecutionPlan for a natural language goal.
-        Renders progress indicators, step results, and grounded final synthesis.
+        Generates and executes an ExecutionPlan for a natural language goal within a multi-turn session.
+        Renders progress indicators, step results, grounded final synthesis, and records dialogue turns.
         """
+        sess_id = session_id or self.session_id
+        # Record user turn in active session drawer (MemPalace pattern)
+        self.memory.add_turn(session_id=sess_id, role="user", content=goal)
+
         self.console.print(f"\n[bold cyan]✦ Goal:[/] [white]{goal}[/]")
 
-        # 1. Plan generation
+        # 1. Plan generation with session conversation context
         with self.console.status(
             "[bold cyan]Formulating executive plan...[/bold cyan]", spinner="dots"
         ):
-            context = self.planner.build_planning_context(goal)
+            context = self.planner.build_planning_context(goal, session_id=sess_id)
             plan = self.planner.generate_plan(goal, context=context)
 
         self.render_plan(plan)
@@ -217,58 +235,19 @@ class WorkOSApp:
             self.console.print("[yellow]Plan-only mode: execution skipped.[/yellow]\n")
             return plan
 
-        # 2. Execution phase with live status
-        self.console.print("\n[bold cyan]✦ Executing Plan Steps:[/]")
-        completed_steps: dict[int, PlanStep] = {}
-        prev_step: PlanStep | None = None
+        # 2. Execution phase via topological DAG engine
+        self.console.print("\n[bold cyan]✦ Executing Plan Steps via DAG Engine:[/]")
+        with self.console.status(
+            "[yellow]Executing plan steps in topological dependency order...[/yellow]",
+            spinner="dots",
+        ):
+            executed_plan = await self.planner.execute_plan(plan, context=context)
 
-        for step in plan.steps:
-            step.status = "in_progress"
-            step_label = f"Step {step.step_id} [{step.assigned_agent}]: {step.description}"
-
-            with self.console.status(f"[yellow]{step_label}...[/yellow]", spinner="dots"):
-                step.input_data = _resolve_variables_in_dict(
-                    step.input_data, completed_steps, prev_step
-                )
-
-                agent = self.planner.agents.get(step.assigned_agent)
-                if not agent:
-                    step.status = "failed"
-                    step.result = ExecutionResult(
-                        task_id=str(step.step_id),
-                        agent_name=step.assigned_agent,
-                        success=False,
-                        error=f"Unknown agent: {step.assigned_agent}",
-                    )
-                else:
-                    instruction = step.input_data.get("instruction") or step.description
-                    context_args = {k: v for k, v in step.input_data.items() if k != "instruction"}
-                    task = SubagentTask(
-                        task_id=f"step_{step.step_id}",
-                        agent_name=step.assigned_agent,
-                        instruction=instruction,
-                        context=context_args,
-                    )
-                    try:
-                        res = await self._dispatch_agent(agent, task)
-                        step.result = res
-                        step.status = "completed" if res.success else "failed"
-                    except Exception as e:
-                        step.status = "failed"
-                        step.result = ExecutionResult(
-                            task_id=task.task_id,
-                            agent_name=step.assigned_agent,
-                            success=False,
-                            error=str(e),
-                        )
-
-            completed_steps[step.step_id] = step
-            prev_step = step
-
-            # Step outcome reporting
+        # Step outcome reporting
+        for step in executed_plan.steps:
             if step.status == "completed":
                 self.console.print(
-                    f"  [bold green]✓[/bold green] [white]Step {step.step_id}: {step.description}[/white]"
+                    f"  [bold green]✓[/bold green] [white]Step {step.step_id} [{step.assigned_agent}]: {step.description}[/white]"
                 )
                 if step.result and step.result.artifacts:
                     for art in step.result.artifacts:
@@ -278,15 +257,18 @@ class WorkOSApp:
             else:
                 err = step.result.error if step.result else "Unknown error"
                 self.console.print(
-                    f"  [bold red]✗[/bold red] [white]Step {step.step_id} Failed:[/] [red]{err}[/red]"
+                    f"  [bold red]✗[/bold red] [white]Step {step.step_id} [{step.assigned_agent}] Failed:[/] [red]{err}[/red]"
                 )
 
-        # 3. Final synthesis
+        # 3. Final synthesis with session dialogue awareness
         with self.console.status(
             "[bold cyan]Synthesizing final executive response...[/bold cyan]",
             spinner="dots",
         ):
-            final_summary = self.planner.synthesize_response(plan)
+            final_summary = self.planner.synthesize_response(executed_plan, session_id=sess_id)
+
+        # Record assistant response turn in active session drawer
+        self.memory.add_turn(session_id=sess_id, role="assistant", content=final_summary)
 
         # Render final output
         synthesis_panel = Panel(
@@ -300,13 +282,13 @@ class WorkOSApp:
         )
         self.console.print("\n", synthesis_panel, "\n")
 
-        # 4. Async memory reflection
+        # 4. Async memory reflection with full session context
         try:
-            await self.planner.reflect_async(goal, plan)
+            await self.planner.reflect_async(goal, executed_plan, session_id=sess_id)
         except Exception as e:
             self.console.print(f"[dim red]Reflection warning: {e}[/dim red]")
 
-        return plan
+        return executed_plan
 
     async def handle_command(self, cmd_line: str) -> bool:
         """
@@ -356,6 +338,9 @@ class WorkOSApp:
                 goal_str = line[len(cmd) :].strip()
                 await self.execute_goal(goal_str, plan_only=True)
                 return True
+
+            elif cmd == "/session":
+                return await self._handle_session_cmd(args)
 
             elif cmd == "/memory":
                 return await self._handle_memory_cmd(args)
@@ -456,11 +441,78 @@ class WorkOSApp:
             self.console.print(
                 f"[green]✓ Autonomy level updated to: [bold]{new_level.value}[/bold][/green]"
             )
+
+    async def _handle_session_cmd(self, args: list[str]) -> bool:
+        """Handles /session subcommands for multi-turn dialogue management."""
+        if not args or args[0] == "status":
+            turns = self.memory.get_session_dialogue(self.session_id, limit=10)
+            self.console.print(f"[bold cyan]Active Session:[/] [yellow]{self.session_id}[/yellow]")
+            self.console.print(
+                f"[dim]Total recorded turns in current session: {len(turns)}[/dim]\n"
+            )
+            if turns:
+                table = Table(title=f"Recent Dialogue ({self.session_id})", box=ROUNDED)
+                table.add_column("Role", style="bold green", width=12)
+                table.add_column("Content", style="white")
+                for t in turns:
+                    table.add_row(
+                        t.role.capitalize(),
+                        t.content[:150] + ("..." if len(t.content) > 150 else ""),
+                    )
+                self.console.print(table)
+            return True
+
+        subcmd = args[0].lower()
+        if subcmd == "new":
+            old_sess = self.session_id
+            self.session_id = f"cli_{uuid.uuid4().hex[:8]}"
+            self.console.print(
+                f"[green]✓ Started new conversation session: [bold cyan]{self.session_id}[/bold cyan] (was {old_sess})[/green]"
+            )
+            return True
+
+        elif subcmd == "clear":
+            count = self.memory.clear_session(self.session_id)
+            self.console.print(
+                f"[green]✓ Cleared {count} dialogue turns from session {self.session_id}.[/green]"
+            )
+            return True
+
+        elif subcmd == "list":
+            sessions = self.memory.list_sessions()
+            if not sessions:
+                self.console.print("[yellow]No conversation sessions found in memory.[/yellow]")
+                return True
+            table = Table(title="Conversation Sessions (MemPalace Drawers)", box=ROUNDED)
+            table.add_column("Session ID", style="bold cyan")
+            table.add_column("Turns", style="white")
+            table.add_column("Active", style="green")
+            for s in sessions:
+                is_active = "✓ (current)" if s["session_id"] == self.session_id else ""
+                table.add_row(s["session_id"], str(s.get("turn_count", 0)), is_active)
+            self.console.print(table)
+            return True
+
+        elif subcmd in ("history", "show"):
+            turns = self.memory.get_session_dialogue(self.session_id, limit=30)
+            if not turns:
+                self.console.print(
+                    f"[yellow]No dialogue recorded yet in session {self.session_id}.[/yellow]"
+                )
+                return True
+            table = Table(title=f"Full Session History ({self.session_id})", box=ROUNDED)
+            table.add_column("Role", style="bold green", width=12)
+            table.add_column("Content", style="white")
+            for t in turns:
+                table.add_row(t.role.capitalize(), t.content)
+            self.console.print(table)
+            return True
+
         else:
             self.console.print(
-                "[red]Invalid autonomy level. Choose either 'FULL' or 'SUPERVISED'.[/red]"
+                f"[red]Unknown /session subcommand: {subcmd}. Use status, new, clear, list, or history.[/red]"
             )
-        return True
+            return True
 
     async def _handle_memory_cmd(self, args: list[str]) -> bool:
         """Handles /memory subcommands."""
@@ -593,6 +645,45 @@ class WorkOSApp:
                 self.console.print(f"[green]✓ Email {subcmd} action completed: {res.data}[/green]")
             else:
                 self.console.print(f"[red]Mail action failed: {res.error}[/red]")
+            return True
+
+        elif subcmd == "organize":
+            params: dict[str, Any] = {}
+            filtered_args = []
+            for a in args[1:]:
+                if a == "--unread":
+                    params["seen"] = False
+                elif a == "--read":
+                    params["seen"] = True
+                else:
+                    filtered_args.append(a)
+
+            if filtered_args:
+                params["category"] = filtered_args[0]
+            if len(filtered_args) > 1:
+                params["sender"] = filtered_args[1]
+            if len(filtered_args) > 2:
+                params["date_gte"] = filtered_args[2]
+
+            task = SubagentTask(
+                "mail_cli",
+                "mail_agent",
+                "organize_emails",
+                params,
+            )
+            res = await self._dispatch_agent(self.planner.mail_agent, task)
+            if res.success:
+                data = res.data if isinstance(res.data, dict) else {}
+                count = data.get("organized_count", 0)
+                cat = data.get("category", params.get("category", "Organized"))
+                self.console.print(f"[green]✓ Organized {count} emails into '{cat}'.[/green]")
+                actions = data.get("actions_taken", [])
+                for act in actions[:10]:
+                    self.console.print(
+                        f"  • {act.get('from', '')}: {act.get('subject', '')} -> {act.get('destination')}"
+                    )
+            else:
+                self.console.print(f"[red]Mail organize failed: {res.error}[/red]")
             return True
 
         else:
@@ -732,7 +823,7 @@ def create_app(
 def parse_cli_args(args: list[str] | None = None) -> argparse.Namespace:
     """Parses command line arguments."""
     parser = argparse.ArgumentParser(
-        description="WorkOS — Personal Executive AI Operating System",
+        description="WorkOS — Autonomous Executive AI Operating System",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(

@@ -3,9 +3,10 @@ import os
 import re
 import sqlite3
 import time
+import uuid
 from typing import Any
 
-from workos_engine.types import MemoryItem, MemoryNetwork
+from workos_engine.types import ConversationTurn, MemoryItem, MemoryNetwork
 
 
 class MemoryDB:
@@ -132,6 +133,23 @@ class MemoryDB:
                 "CREATE INDEX IF NOT EXISTS idx_memories_superseded ON memories(superseded_by);"
             )
 
+            # 7. Conversation turns table for multi-turn sessions (MemPalace dialogue drawers)
+            self.conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS conversation_turns (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    metadata TEXT DEFAULT '{}'
+                );
+                """
+            )
+            self.conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_turns_session ON conversation_turns(session_id, created_at);"
+            )
+
     def _row_to_memory_item(self, row: sqlite3.Row) -> MemoryItem:
         raw_meta = row["metadata"]
         meta = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta or {})
@@ -150,6 +168,21 @@ class MemoryDB:
         )
 
     def insert_memory(self, item: MemoryItem) -> str:
+        content_str = (
+            json.dumps(item.content)
+            if isinstance(item.content, (dict, list))
+            else str(item.content)
+        )
+        key_str = str(item.key)
+        wing_str = str(item.wing)
+        hall_str = str(item.hall)
+        conf_val = float(item.confidence) if item.confidence is not None else 1.0
+        meta_str = (
+            json.dumps(item.metadata or {})
+            if isinstance(item.metadata, dict)
+            else str(item.metadata or "{}")
+        )
+
         with self.conn:
             self.conn.execute(
                 """
@@ -159,22 +192,22 @@ class MemoryDB:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
-                    item.id,
+                    str(item.id),
                     item.network.value
                     if isinstance(item.network, MemoryNetwork)
                     else str(item.network),
-                    item.wing,
-                    item.hall,
-                    item.key,
-                    item.content,
-                    item.confidence,
-                    json.dumps(item.metadata or {}),
+                    wing_str,
+                    hall_str,
+                    key_str,
+                    content_str,
+                    conf_val,
+                    meta_str,
                     item.superseded_by,
                     item.created_at or time.time(),
                     item.updated_at or time.time(),
                 ),
             )
-        return item.id
+        return str(item.id)
 
     def get_memory(self, item_id: str) -> MemoryItem | None:
         cursor = self.conn.execute("SELECT * FROM memories WHERE id = ?;", (item_id,))
@@ -411,6 +444,112 @@ class MemoryDB:
                 "updated_at": float(row["updated_at"]),
             }
         return None
+
+    def add_conversation_turn(
+        self,
+        session_id: str,
+        role: str,
+        content: Any,
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """
+        Records a verbatim conversation turn into the session drawer (MemPalace pattern).
+        """
+        turn_id = f"turn_{uuid.uuid4().hex[:12]}"
+        now = time.time()
+        content_str = json.dumps(content) if isinstance(content, (dict, list)) else str(content)
+        meta_str = json.dumps(metadata or {}) if isinstance(metadata, dict) else "{}"
+
+        with self.conn:
+            self.conn.execute(
+                """
+                INSERT INTO conversation_turns (id, session_id, role, content, created_at, metadata)
+                VALUES (?, ?, ?, ?, ?, ?);
+                """,
+                (turn_id, str(session_id), str(role), content_str, now, meta_str),
+            )
+        return turn_id
+
+    def get_conversation_turns(
+        self,
+        session_id: str,
+        limit: int = 20,
+    ) -> list[ConversationTurn]:
+        """
+        Retrieves ordered conversation turns for an active session drawer.
+        """
+        cursor = self.conn.execute(
+            """
+            SELECT id, session_id, role, content, created_at, metadata
+            FROM conversation_turns
+            WHERE session_id = ?
+            ORDER BY created_at ASC
+            LIMIT ?;
+            """,
+            (str(session_id), limit),
+        )
+        rows = cursor.fetchall()
+        turns = []
+        for r in rows:
+            raw_meta = r["metadata"]
+            meta = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta or {})
+            turns.append(
+                ConversationTurn(
+                    id=r["id"],
+                    session_id=r["session_id"],
+                    role=r["role"],
+                    content=r["content"],
+                    created_at=float(r["created_at"]),
+                    metadata=meta,
+                )
+            )
+        return turns
+
+    def clear_session_turns(self, session_id: str) -> int:
+        """
+        Clears all conversation turns for a given session.
+        """
+        with self.conn:
+            cursor = self.conn.execute(
+                "DELETE FROM conversation_turns WHERE session_id = ?;",
+                (str(session_id),),
+            )
+            return cursor.rowcount
+
+    def list_active_sessions(self) -> list[dict[str, Any]]:
+        """
+        Lists all recorded conversation sessions with turn counts and timestamps.
+        """
+        cursor = self.conn.execute(
+            """
+            SELECT session_id, COUNT(*) as turn_count, MIN(created_at) as started_at, MAX(created_at) as last_activity
+            FROM conversation_turns
+            GROUP BY session_id
+            ORDER BY last_activity DESC;
+            """
+        )
+        return [dict(r) for r in cursor.fetchall()]
+
+    def deduplicate_memories(self) -> int:
+        """
+        Removes exact duplicate memory items, keeping the newest entry.
+        """
+        sql = """
+            DELETE FROM memories
+            WHERE id NOT IN (
+                SELECT id FROM (
+                    SELECT id,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY network, wing, hall, key, content
+                               ORDER BY updated_at DESC
+                           ) as rn
+                    FROM memories
+                ) WHERE rn = 1
+            );
+        """
+        with self.conn:
+            cursor = self.conn.execute(sql)
+            return cursor.rowcount
 
     def close(self):
         try:

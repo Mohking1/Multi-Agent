@@ -6,6 +6,7 @@ import logging
 import re
 import uuid
 from datetime import datetime
+from graphlib import CycleError, TopologicalSorter
 from typing import Any
 
 from config import WorkOSConfig, get_config
@@ -14,28 +15,47 @@ from workos_engine.agents.doc_agent import DocAgent
 from workos_engine.agents.mail_agent import MailAgent
 from workos_engine.agents.rag_agent import RAGAgent
 from workos_engine.agents.web_agent import WebAgent
+from workos_engine.debug import get_tracer
+from workos_engine.llm_client import extract_and_parse_json
 from workos_engine.memory.networks import CognitiveMemoryEngine
 from workos_engine.types import (
+    BlackboardState,
     ExecutionPlan,
     ExecutionResult,
     MemoryNetwork,
     PlanStep,
+    StepReference,
     SubagentTask,
 )
 
 logger = logging.getLogger(__name__)
 
 
+class PlanParseError(RuntimeError):
+    """Raised when an LLM response cannot be parsed into a valid execution plan."""
+
+
 def _lookup_exact_variable(
-    var_token: str,
+    var_token: Any,
     completed_steps: dict[int, PlanStep],
     prev_step: PlanStep | None,
+    blackboard: BlackboardState | None = None,
 ) -> Any:
-    """Resolves a single atomic token like '$step_1.saved_path' or '$prev.output'."""
+    """Resolves a typed StepReference or atomic string token like '$step_1.saved_path' or '$prev.data'."""
+    if isinstance(var_token, StepReference):
+        if blackboard:
+            return blackboard.get_step_output(var_token.step_id, var_token.output_key)
+        target = completed_steps.get(var_token.step_id)
+        if target and target.result:
+            if var_token.output_key and isinstance(target.result.data, dict):
+                return target.result.data.get(var_token.output_key)
+            return target.result.data
+        return None
+
     if not isinstance(var_token, str) or not var_token.startswith("$"):
         return var_token
 
-    token = var_token[1:]  # strip leading $
+    token = var_token[1:].strip()  # strip leading $
     parts = token.split(".")
     target_step: PlanStep | None = None
 
@@ -57,89 +77,48 @@ def _lookup_exact_variable(
             return res.data
         if res.artifacts:
             return res.artifacts[0]
-        return var_token
+    field_path = parts[1:]
+    if field_path[0] == "artifacts":
+        if len(field_path) > 1:
+            try:
+                idx = int(field_path[1])
+                return res.artifacts[idx] if len(res.artifacts) > idx else var_token
+            except ValueError:
+                pass
+        return res.artifacts if res.artifacts else var_token
+    if field_path[0] == "artifact":
+        return res.artifacts[0] if res.artifacts else var_token
+    if field_path[0] == "saved_paths":
+        if isinstance(res.data, dict) and "saved_paths" in res.data:
+            return res.data["saved_paths"]
+        return res.artifacts if res.artifacts else var_token
+    if field_path[0] == "saved_path":
+        if isinstance(res.data, dict) and "saved_path" in res.data:
+            return res.data["saved_path"]
+        return res.artifacts[0] if res.artifacts else var_token
+    if field_path[0] == "data":
+        field_path = field_path[1:]
+        if not field_path:
+            return res.data if res.data is not None else var_token
 
     current: Any = res.data
-    field_path = parts[1:]
-
-    if field_path and field_path[0] == "data":
-        field_path = field_path[1:]
-        current = res.data
-    elif field_path and field_path[0] == "artifacts":
-        return res.artifacts
-
     for part in field_path:
         if isinstance(current, dict):
             if part in current:
                 current = current[part]
-            # Fallback smart extraction for web URLs
-            elif part in ("url", "output_url", "link", "web_url", "source_url"):
-                if "url" in current:
-                    current = current["url"]
-                elif (
-                    "results" in current
-                    and isinstance(current["results"], list)
-                    and current["results"]
-                ):
-                    first_res = current["results"][0]
-                    current = (
-                        first_res.get("url") if isinstance(first_res, dict) else str(first_res)
-                    )
-                elif "pages" in current and isinstance(current["pages"], list) and current["pages"]:
-                    first_page = current["pages"][0]
-                    current = (
-                        first_page.get("url") if isinstance(first_page, dict) else str(first_page)
-                    )
-                elif (
-                    "citations" in current
-                    and isinstance(current["citations"], list)
-                    and current["citations"]
-                ):
-                    first_cit = current["citations"][0]
-                    current = (
-                        first_cit.get("url") if isinstance(first_cit, dict) else str(first_cit)
-                    )
-                else:
-                    return var_token
-            # Fallback smart extraction for file paths
-            elif part in ("saved_path", "file_path", "path", "attachment", "filename"):
-                if res.artifacts:
-                    return res.artifacts[0]
-                current = (
-                    current.get("saved_path")
-                    or current.get("file_path")
-                    or current.get("path")
-                    or var_token
-                )
-            # Fallback smart extraction for text content
-            elif part in ("output", "summary", "content", "text", "body"):
-                current = (
-                    current.get("content")
-                    or current.get("text")
-                    or current.get("summary")
-                    or current.get("body")
-                    or current.get("final_output")
-                    or var_token
-                )
+            elif part in ("saved_path", "file_path", "path") and res.artifacts:
+                return res.artifacts[0]
             else:
                 return var_token
         elif hasattr(current, part):
             current = getattr(current, part)
         elif isinstance(current, list):
             try:
-                list_idx = int(part)
-                current = current[list_idx]
+                current = current[int(part)]
             except (ValueError, IndexError):
-                if (
-                    part in ("url", "output_url", "link")
-                    and current
-                    and isinstance(current[0], dict)
-                ):
-                    current = current[0].get("url", var_token)
-                else:
-                    return var_token
+                return var_token
         else:
-            if part in ("saved_path", "file_path", "artifact") and res.artifacts:
+            if part in ("saved_path", "file_path") and res.artifacts:
                 return res.artifacts[0]
             return var_token
 
@@ -147,23 +126,27 @@ def _lookup_exact_variable(
 
 
 def _lookup_variable(
-    var_ref: str,
+    var_ref: Any,
     completed_steps: dict[int, PlanStep],
     prev_step: PlanStep | None,
+    blackboard: BlackboardState | None = None,
 ) -> Any:
-    """Resolves variable references, supporting exact object lookups and embedded string substitutions."""
+    """Resolves variable references, supporting StepReference, exact lookups, and embedded string substitutions."""
+    if isinstance(var_ref, StepReference):
+        return _lookup_exact_variable(var_ref, completed_steps, prev_step, blackboard)
+
     if not isinstance(var_ref, str) or "$" not in var_ref:
         return var_ref
 
-    # 1. Exact match (e.g. "$step_1.data" or "$step_2.saved_path") -> returns raw data object
+    # 1. Exact match (e.g. "$step_1.data" or "$step_2.saved_path")
     exact_pattern = r"^\$(?:step_\d+|prev|previous)(?:\.[a-zA-Z0-9_]+)*$"
     if re.match(exact_pattern, var_ref.strip()):
-        return _lookup_exact_variable(var_ref.strip(), completed_steps, prev_step)
+        return _lookup_exact_variable(var_ref.strip(), completed_steps, prev_step, blackboard)
 
-    # 2. Embedded string substitution (e.g. "$step_1.creator projects" -> "Guido van Rossum projects")
+    # 2. Embedded string substitution (e.g. "$step_1.creator projects")
     def _replace_match(match):
         tok = match.group(0)
-        resolved_val = _lookup_exact_variable(tok, completed_steps, prev_step)
+        resolved_val = _lookup_exact_variable(tok, completed_steps, prev_step, blackboard)
         return str(resolved_val) if resolved_val != tok else tok
 
     token_pattern = r"\$(?:step_\d+|prev|previous)(?:\.[a-zA-Z0-9_]+)*"
@@ -174,18 +157,21 @@ def _resolve_variables_in_dict(
     data: dict[str, Any],
     completed_steps: dict[int, PlanStep],
     prev_step: PlanStep | None,
+    blackboard: BlackboardState | None = None,
 ) -> dict[str, Any]:
     """Recursively resolves $step_X variables inside an input_data dictionary."""
     resolved: dict[str, Any] = {}
     for k, v in data.items():
-        if isinstance(v, str) and "$" in v:
-            resolved[k] = _lookup_variable(v, completed_steps, prev_step)
+        if isinstance(v, StepReference):
+            resolved[k] = _lookup_exact_variable(v, completed_steps, prev_step, blackboard)
+        elif isinstance(v, str) and "$" in v:
+            resolved[k] = _lookup_variable(v, completed_steps, prev_step, blackboard)
         elif isinstance(v, dict):
-            resolved[k] = _resolve_variables_in_dict(v, completed_steps, prev_step)
+            resolved[k] = _resolve_variables_in_dict(v, completed_steps, prev_step, blackboard)
         elif isinstance(v, list):
             resolved[k] = [
-                _lookup_variable(item, completed_steps, prev_step)
-                if isinstance(item, str) and "$" in item
+                _lookup_variable(item, completed_steps, prev_step, blackboard)
+                if (isinstance(item, (str, StepReference)) and (isinstance(item, StepReference) or "$" in item))
                 else item
                 for item in v
             ]
@@ -232,27 +218,36 @@ class ExecutivePlanner:
         self.client = client or self._init_ollama_client()
 
     def _init_ollama_client(self) -> Any:
-        """Initializes the Ollama Client."""
+        """Initializes the configured LLM Client (Gemini or Ollama)."""
         try:
-            from workos_engine.llm_client import OllamaClient
+            from workos_engine.llm_client import get_llm_client
 
-            return OllamaClient(
-                base_url=self.config.ollama_base_url,
-                default_model=self.config.model_name,
-                embedding_model=self.config.embedding_model,
-            )
+            return get_llm_client(self.config)
         except Exception as e:
-            logger.warning(f"Could not initialize Ollama Client: {e}")
+            logger.warning(f"Could not initialize LLM Client: {e}")
             return None
 
-    def build_planning_context(self, goal: str) -> str:
+    def build_planning_context(self, goal: str, session_id: str | None = None) -> str:
         """
-        Gathers active beliefs and relevant recalled domain facts/entities
-        to build a compact, clean context prompt for planning.
+        Gathers active beliefs, session conversation history, and relevant recalled
+        domain facts/entities/experiences to build a cohesive context prompt for planning.
         """
         parts = [f"Current System Date: {datetime.now().strftime('%Y-%m-%d')}"]
 
-        # 1. Spatial index summary
+        # 1. Multi-turn dialogue history from active session drawer (MemPalace pattern)
+        if session_id:
+            try:
+                turns = self.memory.get_session_dialogue(session_id=session_id, limit=8)
+                if turns:
+                    dialogue_lines = [f"  [{t.role.upper()}]: {t.content}" for t in turns]
+                    parts.append(
+                        "Recent Conversation History (Active Session):\n"
+                        + "\n".join(dialogue_lines)
+                    )
+            except Exception as e:
+                logger.debug(f"Error getting session dialogue: {e}")
+
+        # 2. Spatial index summary
         try:
             summary = self.memory.get_context_index_summary()
             if summary:
@@ -260,7 +255,7 @@ class ExecutivePlanner:
         except Exception as e:
             logger.debug(f"Error getting spatial summary: {e}")
 
-        # 2. Active beliefs and preferences
+        # 3. Active beliefs and preferences (Hindsight mental models)
         try:
             active_beliefs = self.memory.get_active_beliefs()
             if active_beliefs:
@@ -271,19 +266,25 @@ class ExecutivePlanner:
         except Exception as e:
             logger.debug(f"Error getting active beliefs: {e}")
 
-        # 2. Relevant recalled domain facts and entities (strictly excluding raw noisy execution logs)
+        # 4. Relevant recalled domain facts, entities, and past experiences (Hindsight Recall)
         try:
-            recalled = self.memory.recall(query=goal, limit=5)
+            recalled_facts = self.memory.recall(
+                query=goal, network=MemoryNetwork.FACTS, limit=8
+            )
+            recalled_entities = self.memory.recall(
+                query=goal, network=MemoryNetwork.ENTITIES, limit=4
+            )
+            recalled_experiences = self.memory.recall(
+                query=goal, network=MemoryNetwork.EXPERIENCES, limit=4
+            )
+
             clean_facts = []
-            for m in recalled:
-                if m.network in (
-                    MemoryNetwork.FACTS,
-                    MemoryNetwork.ENTITIES,
-                    MemoryNetwork.BELIEFS,
-                ):
-                    clean_facts.append(f"- [{m.network.value}:{m.key}] {m.content[:200]}")
+            for m in recalled_facts + recalled_entities + recalled_experiences:
+                clean_facts.append(f"- [{m.network.value}:{m.wing}:{m.key}] {m.content}")
             if clean_facts:
-                parts.append("Relevant Recalled Knowledge:\n" + "\n".join(clean_facts))
+                parts.append(
+                    "Relevant Recalled Knowledge & Verified Facts:\n" + "\n".join(clean_facts)
+                )
         except Exception as e:
             logger.debug(f"Error recalling facts for goal: {e}")
 
@@ -310,25 +311,61 @@ class ExecutivePlanner:
             'Your ONLY role is to output a JSON object containing the "goal" and a sequential "steps" array decomposing the request across specialist agents:\n\n'
             "Specialist Agents:\n"
             "- 'mail_agent': Email management, search, folder creation, moving, and organizing in the inbox.\n"
-            "- 'web_agent': Live web search, news, portals, and online timelines.\n"
+            "- 'web_agent': Live web search, news, portals, verifying institutions/domains, and online research.\n"
             "- 'doc_agent': Document and table parsing.\n"
             "- 'rag_agent': Internal knowledge base search.\n\n"
-            "Agent Selection Rules:\n"
-            "- If the user mentions 'emails', 'inbox', 'folder', 'organize emails', or 'sort emails': ALWAYS use 'mail_agent'. Do NOT use 'web_agent' unless the user explicitly requested online web searching.\n"
-            "- Use 'web_agent' ONLY if the user explicitly asks to search online, web, internet, or check external deadlines.\n\n"
+            "Delegation Principles:\n"
+            "- Delegate the high-level GOAL/INTENT to the specialist agent. Specialist agents know their domain tools and will autonomously retrieve candidates, verify data, and execute operations.\n"
+            "- For email organization, sorting, or moving: assign a single step to 'mail_agent' with the high-level goal. Do NOT emit micro-steps like 'create_label' or 'create_folder'.\n"
+            "- If web verification or online research is needed, assign steps to 'web_agent'.\n"
+            "- DAG Dependencies & Variable Passing:\n"
+            "  * If a step depends on an earlier step, declare 'dependencies': [step_id, ...].\n"
+            "  * Reference outputs from earlier steps using variable tokens in 'input_data':\n"
+            "    - '$step_1.artifacts' or '$step_1.saved_paths' (for files downloaded/created in step 1)\n"
+            "    - '$step_1.data' or '$step_1.<key>' (for extracted dictionary fields from step 1)\n\n"
             "Output strictly valid JSON in this exact structure:\n"
+            "```json\n"
             "{\n"
             '  "goal": "<user request>",\n'
             '  "steps": [\n'
-            '    {"step_id": 1, "assigned_agent": "<agent_name>", "description": "<concise description of action>", "input_data": {"instruction": "<action>", "query": "<search keyword or parameters>"}}\n'
+            "    {\n"
+            '      "step_id": 1,\n'
+            '      "assigned_agent": "<agent_name>",\n'
+            '      "description": "<concise description of mission>",\n'
+            '      "dependencies": [],\n'
+            '      "input_data": {\n'
+            '        "goal": "<high-level objective or specific intent>"\n'
+            "      }\n"
+            "    },\n"
+            "    {\n"
+            '      "step_id": 2,\n'
+            '      "assigned_agent": "doc_agent",\n'
+            '      "description": "<parse documents from step 1>",\n'
+            '      "dependencies": [1],\n'
+            '      "input_data": {\n'
+            '        "instruction": "parse_document",\n'
+            '        "file_path": "$step_1.artifacts"\n'
+            "      }\n"
+            "    }\n"
             "  ]\n"
-            "}"
+            "}\n"
+            "```"
         )
 
         user_prompt = f"User Request:\n'{goal}'\n\nCognitive Context & Memory:\n{ctx_text}\n\nFormulate the execution plan now."
 
+        tracer = get_tracer()
         if not self.client or not hasattr(self.client, "generate"):
-            raise RuntimeError("No active LLM client configured for ExecutivePlanner.")
+            logger.warning("No active LLM client configured, building fallback plan.")
+            plan = self._build_fallback_plan(goal, reason="No active LLM client configured")
+            tracer.log_plan(
+                "planner",
+                goal,
+                [{"step_id": s.step_id, "desc": s.description} for s in plan.steps],
+                fallback=True,
+                reason="No LLM client",
+            )
+            return plan
 
         try:
             response_text = self.client.generate(
@@ -336,14 +373,49 @@ class ExecutivePlanner:
                 system=system_prompt,
                 model=self.config.model_name,
                 format="json",
-                temperature=0.1,
             )
-            if response_text:
-                return self._parse_plan_json(response_text, fallback_goal=goal)
-            raise RuntimeError("Ollama returned empty plan response.")
         except Exception as e:
-            logger.error(f"Ollama plan generation failed: {e}")
+            tracer.log_error("planner", e, context={"goal": goal})
             raise RuntimeError(f"Ollama plan generation failed: {e}") from e
+
+        if response_text:
+            try:
+                plan = self._parse_plan_json(response_text, fallback_goal=goal)
+                tracer.log_plan(
+                    "planner",
+                    goal,
+                    [
+                        {"step_id": s.step_id, "desc": s.description, "agent": s.assigned_agent}
+                        for s in plan.steps
+                    ],
+                    fallback=False,
+                )
+                return plan
+            except Exception as e:
+                logger.warning(f"Falling back to heuristic plan after malformed planner JSON: {e}")
+                plan = self._build_fallback_plan(goal, reason=str(e))
+                tracer.log_plan(
+                    "planner",
+                    goal,
+                    [
+                        {"step_id": s.step_id, "desc": s.description, "agent": s.assigned_agent}
+                        for s in plan.steps
+                    ],
+                    fallback=True,
+                    reason=str(e),
+                )
+                return plan
+
+        logger.warning("Ollama returned empty plan response, building fallback plan.")
+        plan = self._build_fallback_plan(goal, reason="Empty LLM response")
+        tracer.log_plan(
+            "planner",
+            goal,
+            [{"step_id": s.step_id, "desc": s.description} for s in plan.steps],
+            fallback=True,
+            reason="Empty response",
+        )
+        return plan
 
     def generate_plan(self, goal: str, context: str | None = None) -> ExecutionPlan:
         """
@@ -353,24 +425,23 @@ class ExecutivePlanner:
 
     def _parse_plan_json(self, response_text: str, fallback_goal: str) -> ExecutionPlan:
         """Parses LLM JSON response into an ExecutionPlan object with multi-format resilience."""
-        text = response_text.strip()
-        if "```json" in text:
-            text = text.split("```json", 1)[1].split("```", 1)[0].strip()
-        elif "```" in text:
-            text = text.split("```", 1)[1].split("```", 1)[0].strip()
-        else:
-            start_obj = text.find("{")
-            start_arr = text.find("[")
-            if start_obj != -1 and (start_arr == -1 or start_obj < start_arr):
-                end_obj = text.rfind("}")
-                if end_obj > start_obj:
-                    text = text[start_obj : end_obj + 1]
-            elif start_arr != -1:
-                end_arr = text.rfind("]")
-                if end_arr > start_arr:
-                    text = text[start_arr : end_arr + 1]
+        data = extract_and_parse_json(response_text)
+        if data is None:
+            # Emergency regex step extraction if JSON structure was broken
+            recovered_steps = []
+            for m_str in re.finditer(
+                r'\{[^{}]*?"assigned_agent"\s*:\s*"[^"]+"[^{}]*?\}', response_text
+            ):
+                from workos_engine.llm_client import repair_json_string
 
-        data = json.loads(text)
+                s_dict = repair_json_string(m_str.group(0))
+                if isinstance(s_dict, dict):
+                    recovered_steps.append(s_dict)
+            if recovered_steps:
+                data = {"goal": fallback_goal, "steps": recovered_steps}
+
+        if data is None:
+            raise PlanParseError(f"planner response was not valid JSON: {response_text[:300]}")
         if isinstance(data, str):
             try:
                 data = json.loads(data)
@@ -383,6 +454,10 @@ class ExecutivePlanner:
         elif isinstance(data, dict):
             goal = data.get("goal", fallback_goal)
             raw_steps = data.get("steps", [])
+        else:
+            raise PlanParseError(
+                f"planner response had unsupported JSON root type: {type(data).__name__}"
+            )
         if isinstance(raw_steps, dict):
             raw_steps = [raw_steps]
         elif not isinstance(raw_steps, list):
@@ -396,16 +471,21 @@ class ExecutivePlanner:
 
         steps = []
         for idx, s in enumerate(raw_steps, 1):
+            deps: list[int] = []
             if isinstance(s, str):
                 desc = s
                 step_id = idx
-                assigned_agent = (
-                    "web_agent"
-                    if any(
-                        w in desc.lower() for w in ["web", "online", "search", "google", "internet"]
-                    )
-                    else "rag_agent"
-                )
+                desc_lower = desc.lower()
+                if any(w in desc_lower for w in ["email", "emails", "inbox", "mailbox"]):
+                    assigned_agent = "mail_agent"
+                elif any(
+                    w in desc_lower for w in ["web", "online", "search", "google", "internet"]
+                ):
+                    assigned_agent = "web_agent"
+                elif any(w in desc_lower for w in ["doc", "parse", "pdf", "table"]):
+                    assigned_agent = "doc_agent"
+                else:
+                    assigned_agent = "rag_agent"
                 input_data = {"instruction": "execute", "query": desc}
             elif isinstance(s, dict):
                 try:
@@ -419,21 +499,9 @@ class ExecutivePlanner:
                     str(s.get("assigned_agent") or s.get("agent") or "").strip().lower()
                 )
 
-                # Normalize agent name based on description and assigned name
+                # Normalize agent name if needed
                 desc_lower = desc.lower()
-                if any(
-                    w in desc_lower
-                    for w in [
-                        "inbox",
-                        "mailbox",
-                        "folder",
-                        "subfolder",
-                        "organize email",
-                        "move email",
-                    ]
-                ):
-                    assigned_agent = "mail_agent"
-                elif assigned_agent not in valid_agents:
+                if assigned_agent not in valid_agents:
                     if any(w in assigned_agent for w in ["mail", "email", "inbox"]):
                         assigned_agent = "mail_agent"
                     elif any(w in assigned_agent for w in ["doc", "parse", "pdf", "table"]):
@@ -445,18 +513,42 @@ class ExecutivePlanner:
                         for w in ["web", "online", "internet", "google", "browse"]
                     ):
                         assigned_agent = "web_agent"
+                    elif any(w in desc_lower for w in ["email", "emails", "inbox", "mailbox"]):
+                        assigned_agent = "mail_agent"
+                    elif any(w in desc_lower for w in ["web", "online", "search online"]):
+                        assigned_agent = "web_agent"
+                    elif any(w in desc_lower for w in ["doc", "parse", "pdf", "table"]):
+                        assigned_agent = "doc_agent"
                     else:
-                        assigned_agent = (
-                            "web_agent"
-                            if ("web" in desc_lower or "online" in desc_lower)
-                            else "mail_agent"
-                        )
+                        assigned_agent = "rag_agent"
 
                 input_data = s.get("input_data") or s.get("params") or s.get("args") or {}
                 if isinstance(input_data, str):
                     input_data = {"instruction": "execute", "query": input_data}
                 elif not isinstance(input_data, dict):
                     input_data = {}
+
+                if assigned_agent == "mail_agent" and any(
+                    w in desc_lower for w in ["organize", "sort", "subfolder"]
+                ):
+                    if input_data.get("instruction") in (None, "", "execute"):
+                        input_data["instruction"] = "organize_emails"
+
+                raw_deps = s.get("dependencies") or s.get("depends_on") or []
+                if isinstance(raw_deps, (int, str)):
+                    try:
+                        deps = [int(raw_deps)]
+                    except ValueError:
+                        deps = []
+                elif isinstance(raw_deps, list):
+                    deps = []
+                    for d in raw_deps:
+                        try:
+                            deps.append(int(d))
+                        except (ValueError, TypeError):
+                            pass
+                else:
+                    deps = []
             else:
                 continue
 
@@ -466,32 +558,114 @@ class ExecutivePlanner:
                     description=desc,
                     assigned_agent=assigned_agent,
                     input_data=input_data,
+                    dependencies=deps,
                     status="pending",
                 )
             )
 
         if not steps:
-            raise RuntimeError(
+            raise PlanParseError(
                 f"Ollama returned plan JSON with no valid steps: {response_text[:300]}"
             )
 
         return ExecutionPlan(goal=goal, steps=steps)
 
-    async def execute_plan(self, plan: ExecutionPlan) -> ExecutionPlan:
+    def _build_fallback_plan(self, goal: str, reason: str = "") -> ExecutionPlan:
+        """Builds a conservative single-step plan when the planner model emits malformed JSON."""
+        text = (goal or "").lower()
+        if any(w in text for w in ["email", "emails", "inbox", "mailbox", "mail"]):
+            assigned_agent = "mail_agent"
+        elif any(
+            w in text for w in ["web", "online", "internet", "google", "website", "url", "news"]
+        ):
+            assigned_agent = "web_agent"
+        elif any(w in text for w in ["parse", "extract table", "pdf", "docx", "document file"]):
+            assigned_agent = "doc_agent"
+        else:
+            assigned_agent = "rag_agent"
+
+        input_data: dict[str, Any] = {
+            "goal": goal,
+            "query": goal,
+            "planner_fallback": True,
+        }
+        if reason:
+            input_data["planner_fallback_reason"] = reason[:500]
+
+        return ExecutionPlan(
+            goal=goal,
+            steps=[
+                PlanStep(
+                    step_id=1,
+                    description=f"Execute user request via {assigned_agent}",
+                    assigned_agent=assigned_agent,
+                    input_data=input_data,
+                    status="pending",
+                )
+            ],
+        )
+
+    async def execute_plan(self, plan: ExecutionPlan, context: str | None = None) -> ExecutionPlan:
         """
-        Executes each PlanStep in the ExecutionPlan sequentially, resolving dynamic variables,
-        tracking status transitions (pending -> in_progress -> completed / failed),
-        and updating step results.
+        Executes each PlanStep in the ExecutionPlan in topological dependency order (DAG),
+        resolving dynamic variables, tracking status transitions (pending -> in_progress -> completed / failed),
+        and updating typed blackboard step outputs.
         """
         completed_steps: dict[int, PlanStep] = {}
         prev_step: PlanStep | None = None
+        blackboard = BlackboardState(root_goal=plan.goal)
+
+        # Build dependency graph
+        graph: dict[int, set[int]] = {}
+        step_map: dict[int, PlanStep] = {s.step_id: s for s in plan.steps}
 
         for step in plan.steps:
+            deps = set(step.dependencies)
+            # Detect implicit $step_X references in input_data
+            for val in str(step.input_data).split():
+                matches = re.findall(r"\$step_(\d+)", val)
+                for m in matches:
+                    deps.add(int(m))
+            graph[step.step_id] = {d for d in deps if d in step_map and d != step.step_id}
+
+        # Validate DAG and obtain topological execution order
+        try:
+            ts = TopologicalSorter(graph)
+            ordered_step_ids = list(ts.static_order())
+        except CycleError as e:
+            logger.error(f"Cycle detected in execution plan dependencies: {e}")
+            raise RuntimeError(f"Plan execution failed: cyclic dependency detected: {e}")
+
+        for step_id in ordered_step_ids:
+            step = step_map[step_id]
+
+            # Check if any prerequisite failed
+            failed_deps = [
+                d for d in graph.get(step_id, set())
+                if step_map[d].status != "completed"
+            ]
+            if failed_deps:
+                step.status = "failed"
+                step.result = ExecutionResult(
+                    task_id=str(step.step_id),
+                    agent_name=step.assigned_agent,
+                    success=False,
+                    error=f"Prerequisite step(s) {failed_deps} failed or were not completed.",
+                )
+                blackboard.add_receipt(
+                    step.step_id,
+                    step.assigned_agent,
+                    f"Skipped due to failed dependencies: {failed_deps}",
+                )
+                prev_step = step
+                continue
+
             step.status = "in_progress"
+            blackboard.current_step_index = step.step_id
 
             # 1. Resolve variable references
             resolved_inputs = _resolve_variables_in_dict(
-                step.input_data, completed_steps, prev_step
+                step.input_data, completed_steps, prev_step, blackboard
             )
             step.input_data = resolved_inputs
 
@@ -505,14 +679,28 @@ class ExecutivePlanner:
                     success=False,
                     error=f"Unknown agent '{step.assigned_agent}' in plan step {step.step_id}",
                 )
+                blackboard.add_receipt(
+                    step.step_id,
+                    step.assigned_agent,
+                    f"Failed: unknown agent {step.assigned_agent}",
+                )
                 prev_step = step
                 continue
 
             # 3. Extract instruction and context
-            instruction = resolved_inputs.get("instruction") or step.description
-            context_args = {k: v for k, v in resolved_inputs.items() if k != "instruction"}
-            context_args.setdefault("goal", plan.goal)
-            context_args.setdefault("step_description", step.description)
+            goal_arg = resolved_inputs.get("goal") or plan.goal
+            instruction = resolved_inputs.get("instruction") or goal_arg or step.description
+            context_args = {
+                k: v for k, v in resolved_inputs.items() if k not in ("instruction", "goal")
+            }
+            context_args["goal"] = goal_arg
+            context_args["step_description"] = step.description
+            if context:
+                context_args["cognitive_context"] = context
+
+            # Inject sequential blackboard state and previous step receipts
+            context_args["blackboard"] = blackboard
+            context_args["previous_steps"] = list(blackboard.completed_steps)
 
             task = SubagentTask(
                 task_id=f"step_{step.step_id}_{uuid.uuid4().hex[:6]}",
@@ -531,6 +719,30 @@ class ExecutivePlanner:
                         res = await res
                 step.result = res
                 step.status = "completed" if res.success else "failed"
+
+                # Record receipt and typed data into blackboard
+                summary = ""
+                step_data = {}
+                if isinstance(res.data, dict):
+                    summary = (
+                        res.data.get("receipt")
+                        or res.data.get("message")
+                        or f"{step.assigned_agent} completed {step.description}"
+                    )
+                    step_data = res.data
+                else:
+                    summary = f"{step.assigned_agent} completed {step.description} (status: {step.status})"
+                    if res.data is not None:
+                        step_data = {"data": res.data}
+
+                if res.artifacts:
+                    step_data["artifacts"] = res.artifacts
+                    if "saved_path" not in step_data:
+                        step_data["saved_path"] = res.artifacts[0]
+
+                step.output_data = step_data
+                blackboard.add_receipt(step.step_id, step.assigned_agent, summary, step_data)
+                completed_steps[step.step_id] = step
             except Exception as e:
                 logger.exception(f"Error executing step {step.step_id}: {e}")
                 step.status = "failed"
@@ -540,26 +752,29 @@ class ExecutivePlanner:
                     success=False,
                     error=str(e),
                 )
-
-            completed_steps[step.step_id] = step
-            prev_step = step
+                blackboard.add_receipt(
+                    step.step_id, step.assigned_agent, f"Failed with exception: {e}"
+                )
+            finally:
+                prev_step = step
 
         return plan
 
-    def synthesize_response(self, plan: ExecutionPlan) -> str:
+    def synthesize_response(self, plan: ExecutionPlan, session_id: str | None = None) -> str:
         """
-        Synthesizes a grounded final user-facing response from step execution results.
+        Synthesizes a grounded final user-facing response from step execution results,
+        taking recent conversational dialogue context into account.
         """
         step_summaries = []
         for s in plan.steps:
             status_str = (
-                f"Step {s.step_id} ({s.assigned_agent}): {s.description} -> [{s.status.upper()}]"
+                f"Step {s.step_id} ({s.assigned_agent}): {s.description} [{s.status.upper()}]"
             )
             if s.result:
                 if s.result.success:
                     if isinstance(s.result.data, dict):
-                        findings = s.result.data.get("findings") or ""
-                        steps_log = s.result.data.get("steps") or []
+                        findings = s.result.data.get("findings") or s.result.data.get("summary")
+                        steps_log = s.result.data.get("steps") or s.result.data.get("timeline")
                         if findings:
                             status_str += f"\nFindings: {findings}"
                         if steps_log:
@@ -570,17 +785,20 @@ class ExecutivePlanner:
                             count = s.result.data.get("organized_count", 0)
                             folders = s.result.data.get("folders_created", [])
                             cat = s.result.data.get("category", "")
-                            status_str += (
-                                f"\nOrganization Result: Organized {count} emails into '{cat}'."
-                            )
-                            if folders:
-                                status_str += f"\nSubfolders Created/Used: {', '.join(folders)}"
-                            actions = s.result.data.get("actions_taken", [])
-                            if actions:
-                                status_str += "\nSample Organized Emails:\n" + "\n".join(
-                                    f"  - [{a.get('label') or 'Email'}] {a.get('from')}: {a.get('subject')} -> {a.get('destination')}"
-                                    for a in actions[:15]
+                            if count == 0:
+                                status_str += f"\nOrganization Result: Zero matching emails found in inbox for '{cat}'. No emails were moved or folders created."
+                            else:
+                                status_str += (
+                                    f"\nOrganization Result: Organized {count} emails into '{cat}'."
                                 )
+                                if folders:
+                                    status_str += f"\nSubfolders Created/Used: {', '.join(folders)}"
+                                actions = s.result.data.get("actions_taken", [])
+                                if actions:
+                                    status_str += "\nSample Organized Emails:\n" + "\n".join(
+                                        f"  - [{a.get('label') or 'Email'}] {a.get('from') or 'Unknown Sender'}: {a.get('subject') or 'No Subject'} -> {a.get('destination')}"
+                                        for a in actions[:15]
+                                    )
                     else:
                         status_str += f"\nData: {str(s.result.data)[:1000]}"
 
@@ -595,11 +813,24 @@ class ExecutivePlanner:
         if not self.client or not hasattr(self.client, "generate"):
             raise RuntimeError("No active LLM client configured for ExecutivePlanner synthesis.")
 
+        session_context = ""
+        if session_id:
+            try:
+                turns = self.memory.get_session_dialogue(session_id=session_id, limit=6)
+                if turns:
+                    dialogue_lines = [f"  [{t.role.upper()}]: {t.content}" for t in turns]
+                    session_context = (
+                        "Recent Conversation Context:\n" + "\n".join(dialogue_lines) + "\n\n"
+                    )
+            except Exception as e:
+                logger.debug(f"Error getting session turns for synthesis: {e}")
+
         try:
             today_str = datetime.now().strftime("%Y-%m-%d")
             prompt = (
                 f"You are the WorkOS Executive AI Operating System.\n"
-                f"Current System Date: {today_str}\n"
+                f"Current System Date: {today_str}\n\n"
+                f"{session_context}"
                 f"The user goal was: '{plan.goal}'\n\n"
                 f"Step Execution History & Retrieved Findings:\n{steps_text}\n\n"
                 f"Synthesize a clear, strictly grounded, professional executive brief based on the data above:\n"
@@ -608,25 +839,51 @@ class ExecutivePlanner:
                 f"3. When real emails are retrieved, cite real sender addresses, subject lines, dates, and whether they represent replies or outbound messages.\n"
                 f"4. If multiple sources or webpages present differing perspectives, compare the arguments and summarize consensus.\n"
                 f"5. Cite sources using [1], [2] referencing source URLs or documents.\n"
-                f"6. Format mathematical expressions with LaTeX ($...$ or $$...$$) and code with markdown code fences."
+                f"6. Format mathematical expressions with LaTeX ($...$ or $$...$$) and code with markdown code fences.\n"
+                f"7. COMPLETE BRIEF: Write a complete, thorough briefing with full explanatory sentences. Explain what actions were performed, what findings were discovered, and what results were achieved. Never stop after a title, header, or '---' divider line.\n"
+                f"8. HUMAN-IN-THE-LOOP CLARIFICATIONS: If any decisions, status determinations, or critical details are missing, ambiguous, or undetermined from emails and documents (i.e. 'unknown' status), clearly list them under a dedicated '### Pending User Clarification / Unknown Decisions' section with concise questions for the user."
             )
             response_text = self.client.generate(
                 prompt=prompt,
                 model=self.config.model_name,
+                temperature=getattr(self.config, "default_temperature", 0.6),
             )
             if response_text:
                 summary = response_text.strip()
+                # Clean up any trailing divider lines
+                if summary.endswith("---"):
+                    summary = summary[:-3].strip()
+                # If the model still generated only a header, append the grounded findings
+                if len(summary.splitlines()) <= 4 and steps_text:
+                    summary += "\n\n**Executive Findings & Status:**\n" + "\n".join(
+                        f"- {line}" for line in steps_text.splitlines() if line.strip()
+                    )
                 plan.final_output = summary
                 return summary
-            raise RuntimeError("Ollama returned empty synthesis response.")
+            logger.warning(
+                "Ollama returned empty synthesis response, generating grounded fallback."
+            )
+            fallback = f"### Executive Operations Brief\n\n**Goal:** {plan.goal}\n\n"
+            if steps_text:
+                fallback += f"**Step Execution History & Retrieved Findings:**\n{steps_text}\n"
+            plan.final_output = fallback
+            return fallback
         except Exception as e:
-            logger.error(f"Ollama synthesis failed: {e}")
-            raise RuntimeError(f"Ollama synthesis failed: {e}") from e
+            logger.warning(
+                f"Ollama synthesis generation failed ({e}), using grounded execution fallback."
+            )
+            fallback = f"### Executive Operations Brief\n\n**Goal:** {plan.goal}\n\n"
+            if steps_text:
+                fallback += f"**Step Execution History & Retrieved Findings:**\n{steps_text}\n"
+            plan.final_output = fallback
+            return fallback
 
     # Alias for compatibility with internal callers
     synthesize_output = synthesize_response
 
-    async def reflect_async(self, goal: str, plan: ExecutionPlan) -> None:
+    async def reflect_async(
+        self, goal: str, plan: ExecutionPlan, session_id: str | None = None
+    ) -> None:
         """
         Asynchronous memory reflection hook that retains the execution experience,
         learned facts, and beliefs in CognitiveMemoryEngine.
@@ -653,9 +910,9 @@ class ExecutivePlanner:
                 },
             )
 
-            # 2. Invoke reflector logic
-            events = [
-                {"type": "user_goal", "content": goal},
+            # 2. Invoke reflector logic with conversation events
+            events: list[Any] = [
+                {"type": "user_goal", "content": goal, "role": "user"},
                 {
                     "type": "plan_steps",
                     "steps": [
@@ -669,8 +926,18 @@ class ExecutivePlanner:
                         for s in plan.steps
                     ],
                 },
-                {"type": "final_output", "content": plan.final_output or ""},
+                {"type": "final_output", "content": plan.final_output or "", "role": "assistant"},
             ]
+
+            # If session dialogue exists, prepend recent dialogue turns for full conversation awareness
+            if session_id:
+                try:
+                    turns = self.memory.get_session_dialogue(session_id=session_id, limit=6)
+                    dialogue_events = [{"role": t.role, "content": t.content} for t in turns]
+                    events = dialogue_events + events
+                except Exception:
+                    pass
+
             self.memory.reflect_and_update(
                 conversation_events=events,
                 model_client=self.client,
@@ -681,28 +948,218 @@ class ExecutivePlanner:
     # Alias for compatibility with internal callers
     async_reflect = reflect_async
 
-    async def run_goal(self, goal: str, user_id: str = "default_user") -> ExecutionPlan:
+    async def run_goal(
+        self,
+        goal: str,
+        user_id: str = "default_user",
+        session_id: str = "default_session",
+        record_user_turn: bool = True,
+    ) -> ExecutionPlan:
         """
-        Receives user goal, injects cognitive memory context, dynamically constructs structured execution plans,
-        dispatches steps to MailAgent, DocAgent, and RAGAgent, synthesizes final outputs,
-        and triggers background memory reflection.
+        Receives user goal, maintains session dialogue, injects cognitive memory context,
+        dynamically constructs structured execution plans, dispatches steps to specialist agents,
+        synthesizes final outputs, and triggers background memory reflection.
         """
-        # 1. Inject cognitive memory context
-        context = self.build_planning_context(goal)
+        # 0. Record user turn in session drawer
+        if record_user_turn:
+            self.memory.add_turn(session_id=session_id, role="user", content=goal)
+
+        # 1. Inject cognitive memory context with session dialogue
+        context = self.build_planning_context(goal, session_id=session_id)
 
         # 2. Generate structured execution plan
         plan = self.generate_plan(goal, context=context)
 
         # 3. Execute plan steps across specialist agents
-        executed_plan = await self.execute_plan(plan)
+        executed_plan = await self.execute_plan(plan, context=context)
 
         # 4. Synthesize final grounded response
-        self.synthesize_response(executed_plan)
+        output = self.synthesize_response(executed_plan, session_id=session_id)
 
-        # 5. Trigger async reflection
-        await self.reflect_async(goal, executed_plan)
+        # 5. Record assistant response in session drawer
+        self.memory.add_turn(session_id=session_id, role="assistant", content=output)
+
+        # 6. Trigger async reflection
+        await self.reflect_async(goal, executed_plan, session_id=session_id)
 
         return executed_plan
 
     # Alias for compatibility with internal callers
     plan_and_execute = run_goal
+
+    def route_intent(self, user_input: str, session_id: str | None = None) -> str:
+        """
+        Intelligently routes incoming user interaction:
+        - 'CONVERSATIONAL': Inquiries about user profile, memory beliefs, past conversations,
+          general assistant questions, advice, drafting, or greetings.
+        - 'AGENT_EXECUTION': Operational workflows requiring multi-agent delegation (emails, documents, web, RAG).
+        """
+        text = (user_input or "").strip().lower()
+        if not text:
+            return "CONVERSATIONAL"
+        if len(text.split()) <= 2 and not re.search(
+            r"\b(email|emails|inbox|mail|web|search|find|parse|pdf|docx|document|rag|vault|send|move|organize|sort)\b",
+            text,
+        ):
+            return "CONVERSATIONAL"
+
+        # Explicit action keywords indicating tool execution
+        action_patterns = [
+            r"\b(organize|sort|label|move|download\s+attachment)\b.*(email|inbox|mail)",
+            r"\b(send|draft|forward)\b.*(email|mail|message)\s+to\b",
+            r"\b(parse|convert|extract\s+table)\b.*(pdf|doc|document|file)",
+            r"\b(search|find|query)\b.*(web|internet|online|searxng|google)",
+            r"\b(query|search|ask)\b.*(knowledge\s+base|rag|documents|index)",
+            r"^(search|find|look\s+up)\s+",
+        ]
+        for pat in action_patterns:
+            if re.search(pat, text, re.IGNORECASE):
+                return "AGENT_EXECUTION"
+
+        conversational_patterns = [
+            r"^(hi|hello|hey|good\s+(morning|afternoon|evening)|howdy)\b",
+            r"^(who\s+are\s+you|what\s+can\s+you\s+do|tell\s+me\s+about\s+yourself)\b",
+            r"\b(where\s+(am\s+i|was\s+i)\s+(planning|applying|going))\b",
+            r"\b(what\s+(are\s+my|is\s+my)\s+(preferences?|beliefs?|targets?|profile))\b",
+            r"\b(what\s+do\s+you\s+know\s+about\s+me|remind\s+me)\b",
+            r"\b(what\s+did\s+we\s+(talk|discuss)\s+about)\b",
+            r"\b(help\s+me\s+(think|brainstorm|draft|write))\b",
+            r"^(thanks?|thank\s+you|awesome|great|cool)\b",
+        ]
+        for pat in conversational_patterns:
+            if re.search(pat, text, re.IGNORECASE):
+                return "CONVERSATIONAL"
+
+        # Short direct questions about self/knowledge
+        words = text.split()
+        if len(words) <= 10 and any(
+            w in words for w in ["i", "my", "me", "you", "who", "where", "what", "how", "am", "was"]
+        ):
+            return "CONVERSATIONAL"
+
+        return "AGENT_EXECUTION"
+
+    async def chat_turn(
+        self,
+        message: str,
+        session_id: str = "default_session",
+        user_id: str = "default_user",
+    ) -> dict[str, Any]:
+        """
+        Interactive conversational assistant turn:
+        Preserves dialogue history in MemPalace drawer, grounds answers in Hindsight cognitive memory,
+        and dynamically dispatches specialist agent DAGs when tools are required.
+        """
+        tracer = get_tracer()
+        try:
+            # 0. Record user turn in session drawer
+            self.memory.add_turn(session_id=session_id, role="user", content=message)
+
+            intent = self.route_intent(message, session_id=session_id)
+            tracer.record(
+                event_type="CHAT_INTENT",
+                component="planner",
+                message=f"User prompt routed to {intent}",
+                session_id=session_id,
+                payload={"message": message, "intent": intent},
+            )
+
+            if intent == "AGENT_EXECUTION":
+                plan = await self.run_goal(
+                    message,
+                    user_id=user_id,
+                    session_id=session_id,
+                    record_user_turn=False,
+                )
+                return {
+                    "type": "plan_execution",
+                    "message": plan.final_output or "Executed goal across specialist agents.",
+                    "plan": {
+                        "goal": plan.goal,
+                        "final_output": plan.final_output,
+                        "steps": [
+                            {
+                                "step_id": s.step_id,
+                                "description": s.description,
+                                "assigned_agent": s.assigned_agent,
+                                "status": s.status,
+                                "result": {
+                                    "success": s.result.success if s.result else False,
+                                    "data": s.result.data if s.result else None,
+                                    "error": s.result.error if s.result else None,
+                                }
+                                if s.result
+                                else None,
+                            }
+                            for s in plan.steps
+                        ],
+                    },
+                    "session_id": session_id,
+                }
+
+            # Conversational / Assistant branch with deep cognitive grounding
+            cognitive_context = self.build_planning_context(message, session_id=session_id)
+            today_str = datetime.now().strftime("%Y-%m-%d")
+
+            system_prompt = (
+                "You are WorkOS, an autonomous executive AI operating system and intelligent assistant.\n"
+                f"Current System Date: {today_str}\n\n"
+                "Persona & Behavioral Rules:\n"
+                "- Articulate, executive, highly capable, and attentive.\n"
+                "- Ground all your answers strictly in the user's stored beliefs, preferences, and recalled knowledge provided in the context.\n"
+                "- If the user asks about their preferences, background, past decisions, or stored knowledge, recall and answer accurately from memory.\n"
+                "- If the user asks for multi-domain actions (searching email, parsing documents, scraping web), summarize and offer to run the workflow.\n"
+                "- Keep conversational responses clean, readable, and well-structured."
+            )
+            user_prompt = (
+                f"User Message:\n'{message}'\n\n"
+                f"Cognitive Context & Memory:\n{cognitive_context}\n\n"
+                "Respond directly as the user's executive assistant:"
+            )
+
+            try:
+                response = self.client.generate(
+                    prompt=user_prompt,
+                    system=system_prompt,
+                    model=self.config.model_name,
+                    temperature=getattr(self.config, "default_temperature", 0.6),
+                )
+                response = response.strip()
+            except Exception as e:
+                logger.warning(f"Conversational generation error: {e}")
+                response = f"I'm here as your WorkOS executive assistant. (System note: {e})"
+
+            # Record assistant response in session drawer
+            self.memory.add_turn(session_id=session_id, role="assistant", content=response)
+
+            # Trigger reflection
+            try:
+                events = [
+                    {"role": "user", "content": message},
+                    {"role": "assistant", "content": response},
+                ]
+                self.memory.reflect_and_update(events, model_client=self.client)
+            except Exception as e:
+                logger.debug(f"Chat reflection error: {e}")
+
+            return {
+                "type": "conversation",
+                "message": response,
+                "session_id": session_id,
+            }
+        except Exception as e:
+            logger.exception(f"Unhandled error in chat_turn: {e}")
+            tracer.log_error(
+                "planner.chat_turn", e, context={"message": message, "session_id": session_id}
+            )
+            err_msg = f"I encountered an error executing this workflow: {e}. Event has been recorded in the Debug Inspector."
+            try:
+                self.memory.add_turn(session_id=session_id, role="assistant", content=err_msg)
+            except Exception:
+                pass
+            return {
+                "type": "error",
+                "message": err_msg,
+                "session_id": session_id,
+                "error": str(e),
+            }

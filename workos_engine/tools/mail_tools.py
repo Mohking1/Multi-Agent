@@ -22,11 +22,11 @@ class MailToolKit:
     def __init__(self, config: WorkOSConfig | None = None):
         self.config = config or get_config()
 
-    def _get_mailbox(self, folder: str = "INBOX") -> MailBox:
+    def _get_mailbox(self, folder: str = "INBOX", timeout: float = 30.0) -> MailBox:
         """Connects and logs into the IMAP mailbox on the given folder."""
         if not self.config.imap_host:
             raise ValueError("IMAP host is not configured.")
-        mb = MailBox(self.config.imap_host, port=self.config.imap_port)
+        mb = MailBox(self.config.imap_host, port=self.config.imap_port, timeout=timeout)
         return mb.login(self.config.imap_user, self.config.imap_password, initial_folder=folder)
 
     def _parse_date(self, d: Any) -> date | None:
@@ -42,23 +42,6 @@ class MailToolKit:
                     return datetime.strptime(d[:10], "%Y-%m-%d").date()
                 except Exception:
                     pass
-        return None
-
-    def _extract_domain_label(self, sender: str) -> str | None:
-        """Extract a clean, human-readable organization or domain label from an email address generically."""
-        if not sender or "@" not in sender:
-            return None
-        domain_part = sender.split("@")[-1].strip().rstrip(">").lower()
-        parts = domain_part.split(".")
-        if len(parts) >= 2:
-            primary = parts[-2] if len(parts[-1]) <= 3 and len(parts) >= 2 else parts[0]
-            clean_name = re.sub(r"[^a-zA-Z0-9_-]", "", primary).strip()
-            if clean_name and len(clean_name) >= 2:
-                return (
-                    clean_name.upper()
-                    if len(clean_name) <= 4
-                    else clean_name.replace("-", " ").title()
-                )
         return None
 
     def search_emails(
@@ -96,7 +79,7 @@ class MailToolKit:
         if search_text:
             criteria["text"] = search_text
 
-        def _format_msg_dict(msg: Any) -> dict[str, Any]:
+        def _format_msg_dict(msg: Any, current_folder: str = "INBOX") -> dict[str, Any]:
             flags = list(getattr(msg, "flags", ()) or ())
             is_seen = "\\Seen" in flags or "SEEN" in flags
             attachments = getattr(msg, "attachments", []) or []
@@ -113,6 +96,7 @@ class MailToolKit:
             )
             return {
                 "uid": getattr(msg, "uid", ""),
+                "folder": current_folder,
                 "subject": getattr(msg, "subject", "") or "",
                 "from": getattr(msg, "from_", "") or "",
                 "to": list(getattr(msg, "to", ()) or ()),
@@ -123,41 +107,204 @@ class MailToolKit:
                 "seen": is_seen,
                 "size": getattr(msg, "size", 0),
                 "has_attachments": len(attachments) > 0,
+                "attachment_names": [
+                    getattr(a, "filename", "") for a in attachments if getattr(a, "filename", "")
+                ],
                 "snippet": body_snippet,
             }
 
         results: list[dict[str, Any]] = []
-        try:
-            with self._get_mailbox(folder=folder) as mailbox:
-                imap_query = AND(**criteria) if criteria else AND(all=True)
-                messages = list(
-                    mailbox.fetch(imap_query, limit=limit, reverse=True, mark_seen=False)
-                )
+        seen_uids: set[str] = set()
 
-                # If exact phrase match returned no results, search distinct keywords
-                if not messages and search_text:
-                    terms = [
-                        w.strip() for w in re.split(r"[\s,]+", search_text) if len(w.strip()) >= 3
-                    ]
-                    if len(terms) > 1:
-                        seen_uids = set()
-                        for t in terms:
+        folders_to_search = [folder]
+        is_gmail = "gmail" in (self.config.imap_host or "").lower()
+        if is_gmail and folder == "INBOX":
+            folders_to_search.append("[Gmail]/All Mail")
+
+        for search_folder in folders_to_search:
+            try:
+                with self._get_mailbox(folder=search_folder) as mailbox:
+                    imap_query = AND(**criteria) if criteria else AND(all=True)
+                    messages = list(
+                        mailbox.fetch(
+                            imap_query, limit=limit, reverse=True, mark_seen=False, bulk=50
+                        )
+                    )
+
+                    # If exact phrase match returned no results, only fall back if ALL significant terms are present
+                    if not messages and search_text:
+                        terms = [
+                            w.strip().lower()
+                            for w in re.split(r"[\s,]+", search_text)
+                            if len(w.strip()) >= 3
+                        ]
+                        if len(terms) > 1:
+                            primary_term = max(terms, key=len)
                             term_criteria = dict(criteria)
-                            term_criteria["text"] = t
+                            term_criteria["text"] = primary_term
                             for msg in mailbox.fetch(
-                                AND(**term_criteria), limit=limit, reverse=True, mark_seen=False
+                                AND(**term_criteria),
+                                limit=limit,
+                                reverse=True,
+                                mark_seen=False,
+                                bulk=50,
                             ):
                                 uid = getattr(msg, "uid", "")
-                                if uid not in seen_uids:
-                                    seen_uids.add(uid)
-                                    messages.append(msg)
+                                body_content = (
+                                    getattr(msg, "text", "") or getattr(msg, "html", "") or ""
+                                ).lower()
+                                subj_content = (getattr(msg, "subject", "") or "").lower()
+                                full_content = f"{subj_content} {body_content}"
+                                # Require ALL terms to be present
+                                if all(t in full_content for t in terms):
+                                    if uid and uid not in seen_uids:
+                                        seen_uids.add(uid)
+                                        messages.append(msg)
 
-                for msg in messages:
-                    results.append(_format_msg_dict(msg))
-        except Exception as e:
-            logger.warning(f"IMAP search error: {e}")
+                    for msg in messages:
+                        uid = getattr(msg, "uid", "")
+                        if uid and uid in seen_uids:
+                            continue
+                        if uid:
+                            seen_uids.add(uid)
+                        results.append(_format_msg_dict(msg, current_folder=search_folder))
+                        if len(results) >= limit:
+                            break
+
+                if len(results) >= limit:
+                    break
+            except Exception as e:
+                err_str = str(e).lower()
+                if (
+                    "auth" in err_str
+                    or "login" in err_str
+                    or "credential" in err_str
+                    or "connection refused" in err_str
+                ):
+                    raise
+                logger.warning(f"IMAP search error in {search_folder}: {e}")
 
         return results
+
+    def search_emails_or(
+        self,
+        keywords: list[str] | None = None,
+        senders: list[str] | None = None,
+        date_gte: Any | None = None,
+        date_lt: Any | None = None,
+        folder: str = "INBOX",
+        limit_per_keyword: int = 150,
+        total_limit: int = 500,
+    ) -> list[dict[str, Any]]:
+        """
+        High-recall disjunctive search fetching emails matching ANY of the provided keywords or senders,
+        optionally bounded by temporal date filters.
+        Reuses IMAP connection across search folders for high-speed retrieval.
+        """
+        raw_keywords = list(keywords or [])
+        raw_senders = list(senders or [])
+        if not raw_keywords and not raw_senders and not date_gte and not date_lt:
+            return []
+
+        def _clean_ascii(s: str) -> str:
+            return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+
+        parsed_gte = self._parse_date(date_gte) if date_gte else None
+        parsed_lt = self._parse_date(date_lt) if date_lt else None
+        base_criteria: dict[str, Any] = {}
+        if parsed_gte:
+            base_criteria["date_gte"] = parsed_gte
+        if parsed_lt:
+            base_criteria["date_lt"] = parsed_lt
+
+        folders_to_search = [folder]
+        is_gmail = "gmail" in (self.config.imap_host or "").lower()
+        if is_gmail and folder.upper() in ("INBOX", "ALL", "ALL MAIL", "[GMAIL]/ALL MAIL"):
+            folders_to_search = ["[Gmail]/All Mail"]
+
+        results_by_uid: dict[str, dict[str, Any]] = {}
+
+        # Build list of criteria
+        criteria_list: list[dict[str, Any]] = []
+        for s in raw_senders:
+            s_clean = _clean_ascii(s.strip()).lstrip("* \t")
+            if s_clean and s_clean not in ("*", "@", "*@*"):
+                criteria_list.append({"from_": s_clean, **base_criteria})
+
+        for kw in raw_keywords:
+            kw_clean = _clean_ascii(kw.strip())
+            if not kw_clean:
+                continue
+            if kw_clean.startswith(".") or "@" in kw_clean:
+                criteria_list.append({"from_": kw_clean, **base_criteria})
+            elif "." in kw_clean and " " not in kw_clean:
+                criteria_list.append({"from_": kw_clean, **base_criteria})
+            else:
+                criteria_list.append({"subject": kw_clean, **base_criteria})
+
+        if not criteria_list and base_criteria:
+            criteria_list.append(dict(base_criteria))
+
+        for search_folder in folders_to_search:
+            try:
+                with self._get_mailbox(folder=search_folder) as mailbox:
+                    for crit in criteria_list:
+                        try:
+                            for msg in mailbox.fetch(
+                                AND(**crit),
+                                limit=limit_per_keyword,
+                                reverse=True,
+                                mark_seen=False,
+                                bulk=50,
+                            ):
+                                uid = getattr(msg, "uid", "")
+                                if uid and uid not in results_by_uid:
+                                    flags = list(getattr(msg, "flags", ()) or ())
+                                    is_seen = "\\Seen" in flags or "SEEN" in flags
+                                    attachments = getattr(msg, "attachments", []) or []
+                                    body_snippet = (
+                                        getattr(msg, "text", "") or getattr(msg, "html", "") or ""
+                                    ).strip()[:300]
+                                    msg_date = getattr(msg, "date", None)
+                                    date_str = (
+                                        msg_date.isoformat()
+                                        if isinstance(msg_date, (datetime, date))
+                                        else str(msg_date)
+                                        if msg_date
+                                        else None
+                                    )
+
+                                    results_by_uid[uid] = {
+                                        "uid": uid,
+                                        "folder": search_folder,
+                                        "subject": getattr(msg, "subject", "") or "",
+                                        "from": getattr(msg, "from_", "") or "",
+                                        "to": list(getattr(msg, "to", ()) or ()),
+                                        "cc": list(getattr(msg, "cc", ()) or ()),
+                                        "bcc": list(getattr(msg, "bcc", ()) or ()),
+                                        "date": date_str,
+                                        "flags": flags,
+                                        "seen": is_seen,
+                                        "size": getattr(msg, "size", 0),
+                                        "has_attachments": len(attachments) > 0,
+                                        "snippet": body_snippet,
+                                    }
+                                    if len(results_by_uid) >= total_limit:
+                                        break
+                        except Exception as e:
+                            logger.debug(
+                                f"Search fetch error for crit {crit} in {search_folder}: {e}"
+                            )
+
+                        if len(results_by_uid) >= total_limit:
+                            break
+            except Exception as folder_err:
+                logger.debug(f"Folder search error in {search_folder}: {folder_err}")
+
+            if len(results_by_uid) >= total_limit:
+                break
+
+        return list(results_by_uid.values())[:total_limit]
 
     def fetch_email(
         self, uid: str, folder: str = "INBOX", mark_seen: bool = False
@@ -203,14 +350,49 @@ class MailToolKit:
                 "attachments": attachments_info,
             }
 
+    def download_attachments(
+        self,
+        uid: str,
+        folder: str = "INBOX",
+        save_dir: str = "./downloads",
+        pattern: str | None = None,
+    ) -> list[str]:
+        """Download all attachments from an email by UID to a local directory, returning saved file paths."""
+        os.makedirs(save_dir, exist_ok=True)
+        saved_paths: list[str] = []
+        with self._get_mailbox(folder=folder) as mailbox:
+            messages = list(mailbox.fetch(AND(uid=uid), mark_seen=False))
+            if not messages:
+                raise ValueError(f"Email with UID '{uid}' not found in folder '{folder}'.")
+            msg = messages[0]
+
+            for att in getattr(msg, "attachments", []) or []:
+                fname = getattr(att, "filename", "") or ""
+                if not fname:
+                    continue
+                if pattern and not re.search(pattern, fname, re.IGNORECASE):
+                    continue
+                saved_path = os.path.join(save_dir, fname)
+                with open(saved_path, "wb") as f:
+                    f.write(getattr(att, "payload", b""))
+                saved_paths.append(os.path.abspath(saved_path))
+
+        return saved_paths
+
     def download_attachment(
         self,
         uid: str,
-        attachment_filename: str,
+        attachment_filename: str | None = None,
         folder: str = "INBOX",
         save_dir: str = "./downloads",
     ) -> str:
         """Download an attachment from an email by UID to a local directory."""
+        if not attachment_filename or attachment_filename.lower() in ("all", "*"):
+            paths = self.download_attachments(uid=uid, folder=folder, save_dir=save_dir)
+            if not paths:
+                raise FileNotFoundError(f"No attachments found in email UID '{uid}'.")
+            return paths[0]
+
         os.makedirs(save_dir, exist_ok=True)
         with self._get_mailbox(folder=folder) as mailbox:
             messages = list(mailbox.fetch(AND(uid=uid), mark_seen=False))
@@ -234,7 +416,7 @@ class MailToolKit:
             with open(saved_path, "wb") as f:
                 f.write(getattr(target_att, "payload", b""))
 
-            return saved_path
+            return os.path.abspath(saved_path)
 
     def create_draft(
         self,
@@ -405,8 +587,16 @@ class MailToolKit:
     ) -> dict[str, Any]:
         """Move an email from one folder to another, ensuring the destination hierarchy exists."""
         self.create_folder(destination_folder)
-        with self._get_mailbox(folder=source_folder) as mailbox:
-            mailbox.move(uid, destination_folder)
+        try:
+            with self._get_mailbox(folder=source_folder) as mailbox:
+                mailbox.move(uid, destination_folder)
+        except Exception:
+            is_gmail = "gmail" in (self.config.imap_host or "").lower()
+            if is_gmail and source_folder == "INBOX":
+                with self._get_mailbox(folder="[Gmail]/All Mail") as mailbox:
+                    mailbox.move(uid, destination_folder)
+            else:
+                raise
         return {
             "status": "moved",
             "uid": uid,
@@ -441,8 +631,10 @@ class MailToolKit:
         category: str | None = None,
         date_gte: Any = None,
         date_lt: Any = None,
-        nested_subfolders: bool = True,
-        domain_pattern: str | None = None,
+        seen: bool | None = None,
+        sender: str | None = None,
+        subject: str | None = None,
+        text: str | None = None,
         folder: str = "INBOX",
         limit: int = 500,
         **kwargs: Any,
@@ -450,268 +642,153 @@ class MailToolKit:
         """
         Organize emails in the mailbox.
         Supports:
-        1. Category-based organization (e.g. category='Archive', nested_subfolders=True)
-        2. Rule-based criteria (rules=[{"match": {...}, "action": "move", "destination": "..."}])
+        1. Rule-based criteria: rules=[{"match": {...}, "action": "move", "destination": "..."}]
+        2. Category-based organization: moves all emails matching search criteria to the specified category folder.
         """
         actions_taken = []
         processed = 0
 
-        # Mode A: Category / Domain Organization
-        if category or not rules:
-            if not category and not domain_pattern and not kwargs.get("text") and not date_gte:
-                return {
-                    "status": "skipped",
-                    "category": None,
-                    "organized_count": 0,
-                    "folders_created": [],
-                    "message": "Organization skipped: No category, domain filter, or search criteria provided.",
-                }
-            root_folder = category or "Organized"
-            self.create_folder(root_folder)
+        # Mode A: Rule-based processing
+        if rules:
+            with self._get_mailbox(folder=folder) as mailbox:
+                messages = list(mailbox.fetch(AND(all=True), limit=limit, mark_seen=False, bulk=50))
+                for msg in messages:
+                    processed += 1
+                    for rule in rules:
+                        match_criteria = rule.get("match", {})
+                        matched = True
 
-            criteria: dict[str, Any] = {}
-            if date_gte:
-                parsed_gte = self._parse_date(date_gte)
-                if parsed_gte:
-                    criteria["date_gte"] = parsed_gte
-            if date_lt:
-                parsed_lt = self._parse_date(date_lt)
-                if parsed_lt:
-                    criteria["date_lt"] = parsed_lt
+                        if "sender" in match_criteria:
+                            sender_val = match_criteria["sender"].lower()
+                            msg_sender = (getattr(msg, "from_", "") or "").lower()
+                            if sender_val not in msg_sender:
+                                matched = False
 
-            if domain_pattern:
-                criteria["from_"] = domain_pattern
+                        if matched and "subject" in match_criteria:
+                            subject_val = match_criteria["subject"].lower()
+                            msg_subject = (getattr(msg, "subject", "") or "").lower()
+                            if subject_val not in msg_subject:
+                                matched = False
 
-            text_filter = kwargs.get("text")
-            if text_filter and isinstance(text_filter, str) and text_filter.strip():
-                clean_q = (
-                    unicodedata.normalize("NFKD", text_filter)
-                    .encode("ascii", "ignore")
-                    .decode("ascii")
-                    .strip()
-                )
-                if clean_q:
-                    criteria["text"] = clean_q
+                        if matched and "seen" in match_criteria:
+                            flags = list(getattr(msg, "flags", ()) or ())
+                            is_seen = "\\Seen" in flags or "SEEN" in flags
+                            if match_criteria["seen"] != is_seen:
+                                matched = False
 
-            folders_to_search = [folder]
-            if folder == "INBOX":
-                folders_to_search.append("[Gmail]/All Mail")
+                        if matched and "text" in match_criteria:
+                            text_val = match_criteria["text"].lower()
+                            msg_text = (
+                                getattr(msg, "text", "") or getattr(msg, "html", "") or ""
+                            ).lower()
+                            if text_val not in msg_text:
+                                matched = False
 
-            folders_created = set()
-            moved_uids = set()
+                        if matched:
+                            action = rule.get("action", "move")
+                            uid = getattr(msg, "uid", "")
+                            msg_subj = getattr(msg, "subject", "")
 
-            for search_folder in folders_to_search:
-                try:
-                    with self._get_mailbox(folder=search_folder) as mailbox:
-                        delim = "/"
-                        try:
-                            for f in mailbox.folder.list():
-                                if getattr(f, "delim", None):
-                                    delim = f.delim
-                                    break
-                        except Exception:
-                            pass
-
-                        def _ensure_on_connection(mb: Any, path: str, d: str = "/") -> None:
-                            norm = path.replace("\\", d).replace("/", d).strip(d)
-                            parts = [p.strip() for p in norm.split(d) if p.strip()]
-                            curr = ""
-                            for p in parts:
-                                curr = f"{curr}{d}{p}" if curr else p
-                                try:
-                                    if not mb.folder.exists(curr):
-                                        mb.folder.create(curr)
-                                except Exception as err:
-                                    err_str = str(err).lower()
-                                    if (
-                                        "exist" not in err_str
-                                        and "duplicate" not in err_str
-                                        and "already" not in err_str
-                                    ):
-                                        logger.debug(f"Error creating '{curr}': {err}")
-
-                        _ensure_on_connection(mailbox, root_folder, delim)
-
-                        try:
-                            messages = list(
-                                mailbox.fetch(
-                                    AND(**criteria) if criteria else AND(all=True),
-                                    limit=limit,
-                                    reverse=True,
-                                    headers_only=True,
-                                    mark_seen=False,
-                                )
-                            )
-                        except Exception as e:
-                            logger.warning(f"Error fetching emails from {search_folder}: {e}")
-                            messages = []
-
-                        for msg in messages:
-                            processed += 1
-                            uid = str(getattr(msg, "uid", ""))
-                            if uid in moved_uids:
-                                continue
-
-                            sender = getattr(msg, "from_", "") or ""
-                            subject = getattr(msg, "subject", "") or ""
-
-                            if domain_pattern:
-                                pat = domain_pattern.lower().strip().lstrip(".")
-                                sender_domain = (
-                                    sender.split("@")[-1].lower().rstrip(">")
-                                    if "@" in sender
-                                    else ""
-                                )
-                                if not (
-                                    sender_domain.endswith(f".{pat}")
-                                    or sender_domain == pat
-                                    or f".{pat}." in sender_domain
-                                ):
-                                    continue
-
-                            domain_label = self._extract_domain_label(sender)
-                            if not domain_label:
-                                continue
-
-                            if domain_label.lower() in (
-                                "gmail",
-                                "yahoo",
-                                "hotmail",
-                                "outlook",
-                                "icloud",
-                            ):
-                                continue
-
-                            dest_folder = (
-                                f"{root_folder}/{domain_label}"
-                                if nested_subfolders
-                                else root_folder
-                            )
-                            try:
-                                _ensure_on_connection(mailbox, dest_folder, delim)
-                                folders_created.add(dest_folder)
-                            except Exception as e:
-                                logger.debug(f"Ensuring folder '{dest_folder}': {e}")
-
-                            try:
-                                mailbox.move(uid, dest_folder)
-                                moved_uids.add(uid)
-                                if nested_subfolders and root_folder != dest_folder:
-                                    try:
-                                        mailbox.copy(uid, root_folder)
-                                    except Exception:
-                                        pass
-
+                            if action == "move":
+                                dest = rule.get("destination", "Archive")
+                                self.create_folder(dest)
+                                mailbox.move(uid, dest)
                                 actions_taken.append(
                                     {
                                         "uid": uid,
                                         "action": "move",
-                                        "label": domain_label,
-                                        "destination": dest_folder,
-                                        "subject": subject,
-                                        "from": sender,
-                                        "date": str(getattr(msg, "date", ""))[:10],
+                                        "destination": dest,
+                                        "subject": msg_subj,
                                     }
                                 )
-                            except Exception as err:
-                                logger.warning(
-                                    f"Failed to move email {uid} to {dest_folder}: {err}"
+                            elif action == "mark_seen":
+                                mailbox.flag(uid, ["\\Seen"], True)
+                                actions_taken.append(
+                                    {
+                                        "uid": uid,
+                                        "action": "mark_seen",
+                                        "subject": msg_subj,
+                                    }
                                 )
-
-                    if actions_taken:
-                        break
-                except Exception as e:
-                    logger.debug(f"Skipping search in {search_folder}: {e}")
+                            elif action == "mark_unseen":
+                                mailbox.flag(uid, ["\\Seen"], False)
+                                actions_taken.append(
+                                    {
+                                        "uid": uid,
+                                        "action": "mark_unseen",
+                                        "subject": msg_subj,
+                                    }
+                                )
+                            elif action == "mark_flagged":
+                                mailbox.flag(uid, ["\\Flagged"], True)
+                                actions_taken.append(
+                                    {
+                                        "uid": uid,
+                                        "action": "mark_flagged",
+                                        "subject": msg_subj,
+                                    }
+                                )
+                            break  # Apply first matching rule per email
 
             return {
                 "status": "organized",
-                "category": root_folder,
                 "processed_count": processed,
                 "organized_count": len(actions_taken),
-                "folders_created": sorted(folders_created),
                 "actions_taken": actions_taken,
             }
 
-        # Mode B: Explicit rule-based processing
-        with self._get_mailbox(folder=folder) as mailbox:
-            messages = list(mailbox.fetch(AND(all=True), limit=limit, mark_seen=False))
-            for msg in messages:
-                processed += 1
-                for rule in rules:
-                    match_criteria = rule.get("match", {})
-                    matched = True
+        # Mode B: Direct category folder organization
+        dest_folder = category or kwargs.get("destination") or kwargs.get("folder_name")
+        if not dest_folder:
+            return {
+                "status": "skipped",
+                "category": None,
+                "organized_count": 0,
+                "message": "Organization skipped: No category or destination folder provided.",
+            }
 
-                    if "sender" in match_criteria:
-                        sender_val = match_criteria["sender"].lower()
-                        msg_sender = (getattr(msg, "from_", "") or "").lower()
-                        if sender_val not in msg_sender:
-                            matched = False
+        effective_sender = sender or kwargs.get("domain_pattern") or kwargs.get("from_")
+        effective_text = text or kwargs.get("query")
 
-                    if matched and "subject" in match_criteria:
-                        subject_val = match_criteria["subject"].lower()
-                        msg_subject = (getattr(msg, "subject", "") or "").lower()
-                        if subject_val not in msg_subject:
-                            matched = False
+        self.create_folder(dest_folder)
 
-                    if matched and "seen" in match_criteria:
-                        flags = list(getattr(msg, "flags", ()) or ())
-                        is_seen = "\\Seen" in flags or "SEEN" in flags
-                        if match_criteria["seen"] != is_seen:
-                            matched = False
+        matched_emails = self.search_emails(
+            sender=effective_sender,
+            subject=subject,
+            date_gte=date_gte,
+            date_lt=date_lt,
+            seen=seen,
+            text=effective_text,
+            folder=folder,
+            limit=limit,
+        )
 
-                    if matched:
-                        action = rule.get("action")
-                        uid = getattr(msg, "uid", "")
-                        subject = getattr(msg, "subject", "")
+        moved_uids = set()
+        for email_info in matched_emails:
+            uid = str(email_info.get("uid", ""))
+            if not uid or uid in moved_uids:
+                continue
 
-                        if action == "move":
-                            dest = rule.get("destination", "Archive")
-                            try:
-                                if not mailbox.folder.exists(dest):
-                                    mailbox.folder.create(dest)
-                            except Exception:
-                                pass
-                            mailbox.move(uid, dest)
-                            actions_taken.append(
-                                {
-                                    "uid": uid,
-                                    "action": "move",
-                                    "destination": dest,
-                                    "subject": subject,
-                                }
-                            )
-                        elif action == "mark_seen":
-                            mailbox.flag(uid, ["\\Seen"], True)
-                            actions_taken.append(
-                                {
-                                    "uid": uid,
-                                    "action": "mark_seen",
-                                    "subject": subject,
-                                }
-                            )
-                        elif action == "mark_unseen":
-                            mailbox.flag(uid, ["\\Seen"], False)
-                            actions_taken.append(
-                                {
-                                    "uid": uid,
-                                    "action": "mark_unseen",
-                                    "subject": subject,
-                                }
-                            )
-                        elif action == "mark_flagged":
-                            mailbox.flag(uid, ["\\Flagged"], True)
-                            actions_taken.append(
-                                {
-                                    "uid": uid,
-                                    "action": "mark_flagged",
-                                    "subject": subject,
-                                }
-                            )
-                        break  # Apply first matching rule per email
+            try:
+                self.move_email(uid=uid, destination_folder=dest_folder, source_folder=folder)
+                moved_uids.add(uid)
+                actions_taken.append(
+                    {
+                        "uid": uid,
+                        "action": "move",
+                        "destination": dest_folder,
+                        "subject": email_info.get("subject", ""),
+                        "from": email_info.get("from", ""),
+                        "date": email_info.get("date", ""),
+                    }
+                )
+            except Exception as err:
+                logger.warning(f"Failed to move email {uid} to {dest_folder}: {err}")
 
         return {
             "status": "organized",
-            "processed_count": processed,
+            "category": dest_folder,
+            "processed_count": len(matched_emails),
             "organized_count": len(actions_taken),
             "actions_taken": actions_taken,
         }

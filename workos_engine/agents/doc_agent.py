@@ -33,8 +33,16 @@ class DocAgent(BaseSubagent):
     def execute_tool(self, tool_name: str, args: dict[str, Any]) -> Any:
         """Dispatches an individual tool call for the DocAgent."""
         t = tool_name.lower().strip()
+        clean_args = dict(args)
         if t in ("parse_document", "parse", "convert"):
-            return self.toolkit.parse_document(**args)
+            if "file_path" not in clean_args:
+                for alt_key in ("file_paths", "artifacts", "saved_paths", "saved_path", "path", "files"):
+                    if alt_key in clean_args and clean_args[alt_key]:
+                        clean_args["file_path"] = clean_args[alt_key]
+                        break
+            valid_keys = {"file_path", "output_format", "ocr", "table_former", "doc_id"}
+            filtered_args = {k: v for k, v in clean_args.items() if k in valid_keys}
+            return self.toolkit.parse_document(**filtered_args)
         elif t in ("extract_tables", "tables", "table_former"):
             return self.toolkit.extract_tables(**args)
         elif t in ("extract_figures", "figures", "images"):
@@ -49,7 +57,7 @@ class DocAgent(BaseSubagent):
             raise ValueError(f"Unknown doc tool: {tool_name}")
 
     def execute(self, task: SubagentTask) -> ExecutionResult:
-        """Executes a delegated document instruction or runs autonomous micro-ReAct loop."""
+        """Executes a delegated document instruction."""
         instruction = (task.instruction or "").lower().strip()
         ctx = dict(task.context or {})
 
@@ -72,6 +80,13 @@ class DocAgent(BaseSubagent):
             "list_stored_documents": "list_stored_documents",
             "list_documents": "list_stored_documents",
         }
+
+        # Normalize flexible file path arguments from upstream steps
+        if "file_path" not in ctx:
+            for alt_key in ("file_paths", "artifacts", "saved_paths", "saved_path", "path", "files"):
+                if alt_key in ctx and ctx[alt_key]:
+                    ctx["file_path"] = ctx[alt_key]
+                    break
 
         if instruction in mapped_tools:
             tool_name = mapped_tools[instruction]
@@ -101,21 +116,24 @@ class DocAgent(BaseSubagent):
                     error=str(e),
                 )
 
-        # Higher-level doc mission -> run micro-ReAct loop
-        return super().execute(task)
+        return ExecutionResult(
+            task_id=task.task_id,
+            agent_name=self.name,
+            success=False,
+            error=f"Unknown instruction: {task.instruction}",
+        )
 
     def get_tool_definitions(self) -> list[dict[str, Any]]:
         """Returns JSON schema definitions of all tools provided by DocAgent for LLM planning."""
         return [
             {
                 "name": "parse_document",
-                "description": "Parse a document (PDF, DOCX, PPTX, HTML, Markdown, Images) into structured content, extracting tables and metadata using Docling.",
+                "description": "Parse a document or list of documents (PDF, DOCX, PPTX, HTML, Markdown, Images) into structured content, extracting tables and metadata using Docling.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "file_path": {
-                            "type": "string",
-                            "description": "Path to the document file to parse.",
+                            "description": "Path to the document file or list of file paths to parse.",
                         },
                         "output_format": {
                             "type": "string",

@@ -3,6 +3,7 @@
 import json
 import logging
 from abc import ABC, abstractmethod
+from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from typing import Any
 
@@ -10,6 +11,13 @@ from config import WorkOSConfig, get_config
 from workos_engine.types import ExecutionResult, SubagentTask
 
 logger = logging.getLogger(__name__)
+
+
+def _json_default(value: Any) -> Any:
+    """Convert dataclass context values into JSON-safe structures."""
+    if is_dataclass(value) and not isinstance(value, type):
+        return asdict(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
 class BaseSubagent(ABC):
@@ -32,15 +40,11 @@ class BaseSubagent(ABC):
         self.model_client = model_client or self._init_model_client()
 
     def _init_model_client(self) -> Any:
-        """Initializes default Ollama client if available."""
+        """Initializes default LLM client (Gemini or Ollama) if available."""
         try:
-            from workos_engine.llm_client import OllamaClient
+            from workos_engine.llm_client import get_llm_client
 
-            return OllamaClient(
-                base_url=self.config.ollama_base_url,
-                default_model=self.config.model_name,
-                embedding_model=self.config.embedding_model,
-            )
+            return get_llm_client(self.config)
         except Exception:
             return None
 
@@ -80,18 +84,7 @@ class BaseSubagent(ABC):
                     error=str(e),
                 )
 
-        # 2. Check for explicit unsupported/unknown op strings (single-word invalid instructions)
-        if any(w in instruction for w in ["unknown", "unsupported", "invalid", "unrecognized"]) or (
-            "_" in instruction and " " not in instruction and instruction not in tools
-        ):
-            return ExecutionResult(
-                task_id=task.task_id,
-                agent_name=self.name,
-                success=False,
-                error=f"Unknown instruction: {task.instruction}",
-            )
-
-        # 3. Autonomous micro-ReAct loop for multi-turn reasoning missions
+        # 2. Autonomous micro-ReAct loop for multi-turn reasoning missions
         if self.model_client and hasattr(self.model_client, "generate"):
             return self.run_react_loop(task)
 
@@ -103,7 +96,7 @@ class BaseSubagent(ABC):
             error=f"Unknown instruction: {task.instruction}",
         )
 
-    def run_react_loop(self, task: SubagentTask, max_iterations: int = 3) -> ExecutionResult:
+    def run_react_loop(self, task: SubagentTask, max_iterations: int = 5) -> ExecutionResult:
         """
         Executes a sequential Thought -> Action -> Observation micro-ReAct loop.
         Confined strictly to this subagent's narrow toolset.
@@ -149,7 +142,7 @@ class BaseSubagent(ABC):
             history_str = "\n".join(history) if history else "No previous actions yet."
             prompt = (
                 f"Assigned Mission: '{mission}'\n\n"
-                f"Context Parameters: {json.dumps(task.context or {})}\n\n"
+                f"Context Parameters: {json.dumps(task.context or {}, default=_json_default)}\n\n"
                 f"Action & Observation History:\n{history_str}\n\n"
                 f"Iteration {iteration}/{max_iterations}. Decide your next action (respond in JSON):"
             )
@@ -159,12 +152,14 @@ class BaseSubagent(ABC):
                     prompt=prompt,
                     system=system_prompt,
                     format="json",
-                    temperature=0.1,
                 )
                 parsed = json.loads(response.strip())
             except Exception as e:
                 logger.warning(f"[{self.name}] ReAct step {iteration} JSON parse error: {e}")
-                break
+                history.append(
+                    f"Step {iteration} Error: Invalid JSON response ({e}). You must output strictly valid JSON matching Format 1 or Format 2."
+                )
+                continue
 
             action = parsed.get("action", "")
             thought = parsed.get("thought", "")
@@ -238,12 +233,20 @@ class BaseSubagent(ABC):
                 summary_res = self.model_client.generate(
                     prompt=obs_summary_prompt,
                     system=f"You are the {self.name}. Summarize your findings based ONLY on your tool observations.",
-                    temperature=0.1,
                 )
                 if summary_res:
                     findings = summary_res.strip()
             except Exception as e:
                 logger.debug(f"[{self.name}] Error consolidating findings: {e}")
+
+        if not findings and not accumulated_data:
+            return ExecutionResult(
+                task_id=task.task_id,
+                agent_name=self.name,
+                success=False,
+                error=f"ReAct loop completed without valid actions or findings for mission: {mission}",
+                data={"steps": history},
+            )
 
         if not findings:
             findings = f"Completed {len(history)} execution steps for mission: {mission}"
@@ -251,7 +254,7 @@ class BaseSubagent(ABC):
         return ExecutionResult(
             task_id=task.task_id,
             agent_name=self.name,
-            success=True,
+            success=bool(accumulated_data),
             data={"findings": findings, "steps": history, "details": accumulated_data},
             artifacts=artifacts,
         )

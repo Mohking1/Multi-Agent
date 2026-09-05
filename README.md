@@ -1,4 +1,4 @@
-# WorkOS — Personal Executive AI Operating System
+# WorkOS — Autonomous Executive AI Operating System
 
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![Inference](https://img.shields.io/badge/Inference-100%25%20Local%20Ollama-emerald.svg)](https://ollama.com/)
@@ -7,7 +7,7 @@
 [![UI](https://img.shields.io/badge/UI-Minimalist%20Web%20Dashboard-cyan.svg)]()
 [![Code Quality](https://img.shields.io/badge/Linter-Ruff-orange.svg)](https://github.com/astral-sh/ruff)
 
-**WorkOS** is an autonomous personal executive AI operating system designed for knowledge workers, executives, and engineers. It runs **100% locally and offline** via **Ollama**, featuring a native subagent execution DAG, an embedded 4-network cognitive memory engine (Loci-Hindsight), lossless original Document Vault with side-by-side citation grounding, autonomous email operations, Docling document intelligence, and Elasticsearch hybrid RAG.
+**WorkOS** is an autonomous executive AI operating system designed for knowledge workers, executives, and engineers worldwide. It runs **100% locally and offline** via **Ollama**, featuring a native subagent execution DAG, an embedded 4-network cognitive memory engine (Loci-Hindsight), lossless original Document Vault with side-by-side citation grounding, autonomous email operations, Docling document intelligence, and Elasticsearch hybrid RAG.
 
 ---
 
@@ -129,12 +129,3 @@ ruff format .
 | `/mail search` | `<query>` | Search inbox emails via IMAP |
 | `/exit` | | Safely exit interactive console |
 
----
-
-## 🧪 Automated Test Suite
-
-Run the full verification test suite across all 10 modules:
-
-```bash
-pytest tests/ -v
-```
